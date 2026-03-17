@@ -5,8 +5,8 @@
   "outputDirectory": "frontend/dist",
   "functions": {
     "api/index.js": {
-      "runtime": "@vercel/node",
-      "includeFiles": "server/**"
+      "includeFiles": "server/**",
+      "maxDuration": 30
     }
   },
   "rewrites": [
