@@ -1,5 +1,5 @@
 const crypto = require('crypto');
-const { getDb } = require('../db');
+const { supabase } = require('../supabase');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'studio-pos-secret-dev-key-change-in-prod';
 
@@ -25,10 +25,9 @@ function verifyToken(token) {
   }
 }
 
-// Express middleware — attaches req.user = { id, name, role }
-function authMiddleware(req, res, next) {
+// Express middleware — attaches req.user = { id, name, role, operator_type }
+async function authMiddleware(req, res, next) {
   // Skip auth for login endpoint and health
-  // When mounted on /api, req.path is relative (e.g. /auth/login not /api/auth/login)
   if (req.path === '/auth/login' || req.path === '/auth/users-list' || req.path === '/health') {
     return next();
   }
@@ -45,17 +44,21 @@ function authMiddleware(req, res, next) {
   }
 
   // Verify user still exists and is active
-  const db = getDb();
-  const user = db.prepare('SELECT id, name, role, is_active FROM users WHERE id = ?').get(payload.userId);
-  if (!user || !user.is_active) {
+  const { data: user, error } = await supabase
+    .from('users')
+    .select('id, name, role, operator_type, is_active')
+    .eq('id', payload.userId)
+    .single();
+
+  if (error || !user || !user.is_active) {
     return res.status(401).json({ error: 'User not found or inactive' });
   }
 
-  req.user = { id: user.id, name: user.name, role: user.role };
+  req.user = { id: user.id, name: user.name, role: user.role, operator_type: user.operator_type };
   next();
 }
 
-// Role check middleware factory
+// Role check middleware factory — supports new role system
 function requireRole(...roles) {
   return (req, res, next) => {
     if (!req.user) return res.status(401).json({ error: 'Not authenticated' });

@@ -150,8 +150,12 @@ export const useStore = create<POSStore>((set, get) => ({
     try {
       const { token, user } = await api.loginWithPin(userId, pin);
       api.setAuthToken(token);
-      localStorage.setItem('pos_user', JSON.stringify(user));
-      set({ currentUser: user, isAuthenticated: true });
+      const userWithType: api.UserInfo = {
+        id: user.id, name: user.name, role: user.role,
+        operator_type: (user as any).operator_type,
+      };
+      localStorage.setItem('pos_user', JSON.stringify(userWithType));
+      set({ currentUser: userWithType, isAuthenticated: true });
       return true;
     } catch {
       return false;

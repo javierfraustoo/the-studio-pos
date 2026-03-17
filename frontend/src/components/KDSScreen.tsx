@@ -44,12 +44,13 @@ function UndoToast({ action, onUndo, onDismiss }: { action: UndoAction; onUndo: 
 // ─── KDS Item Card ──────────────────────────────────────────────────────────
 
 function KdsItemCard({
-  item, now, onMarkReady, onMarkDelivered, userRole,
+  item, now, onMarkReady, onMarkDelivered, userRole, operatorType,
 }: {
   item: KdsItem; now: number;
   onMarkReady: (id: string) => void;
   onMarkDelivered: (id: string) => void;
   userRole: string;
+  operatorType: string;
 }) {
   const elapsed = now - new Date(item.routed_at).getTime();
   const mins = Math.floor(elapsed / 60000);
@@ -95,8 +96,8 @@ function KdsItemCard({
 
       {item.notes && <p style={styles.kdsNotes}>{item.notes}</p>}
 
-      {/* Cashier: ONLY "Entregado" (when item is ready). Barista/Kitchen/Admin/Manager: both buttons */}
-      {item.status !== 'ready' && userRole !== 'cashier' && (
+      {/* Cajero: ONLY "Entregado" (when item is ready). Barista/Cocina/Admin/Supervisor: both buttons */}
+      {item.status !== 'ready' && !(userRole === 'operador' && operatorType === 'cajero') && (
         <button onClick={() => onMarkReady(item.id)}
           style={{ ...styles.kdsActionBtn, backgroundColor: '#059669' }}>
           LISTO
@@ -116,7 +117,8 @@ function KdsItemCard({
 
 export default function KDSScreen() {
   const { kdsItems, fetchKdsItems, currentUser } = useStore();
-  const userRole = currentUser?.role || 'cashier';
+  const userRole = currentUser?.role || 'operador';
+  const operatorType = (currentUser as any)?.operator_type || 'cajero';
   const now = useTimer();
   const [activeStation, setActiveStation] = useState<'bar' | 'kitchen'>('bar');
   const [showHistory, setShowHistory] = useState(false);
@@ -272,7 +274,7 @@ export default function KDSScreen() {
       ) : (
         <div style={styles.kdsGrid}>
           {stationItems.map((item) => (
-            <KdsItemCard key={item.id} item={item} now={now} userRole={userRole}
+            <KdsItemCard key={item.id} item={item} now={now} userRole={userRole} operatorType={operatorType}
               onMarkReady={handleMarkReady} onMarkDelivered={handleMarkDelivered} />
           ))}
         </div>

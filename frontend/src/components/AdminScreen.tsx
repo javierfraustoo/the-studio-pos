@@ -533,8 +533,8 @@ function InventoryManager() {
 // ─── Users Manager ─────────────────────────────────────────────────────────
 
 function UsersManager() {
-  const [users, setUsers] = useState<Array<{ id: string; name: string; role: string; is_active: number }>>([]);
-  const [form, setForm] = useState({ name: '', pin: '', role: 'cashier' });
+  const [users, setUsers] = useState<Array<{ id: string; name: string; role: string; operator_type?: string | null; is_active: number }>>([]);
+  const [form, setForm] = useState({ name: '', pin: '', role: 'operador', operatorType: 'cajero' as string });
   const [showForm, setShowForm] = useState(false);
 
   const load = async () => { setUsers(await api.fetchUsers()); };
@@ -542,14 +542,28 @@ function UsersManager() {
 
   const handleSave = async () => {
     if (!form.name || form.pin.length !== 6) return;
-    await api.createUser(form);
+    const payload: any = { name: form.name, pin: form.pin, role: form.role };
+    if (form.role === 'operador') payload.operatorType = form.operatorType;
+    await api.createUser(payload);
     await load();
-    setShowForm(false); setForm({ name: '', pin: '', role: 'cashier' });
+    setShowForm(false); setForm({ name: '', pin: '', role: 'operador', operatorType: 'cajero' });
   };
 
   const toggleActive = async (u: typeof users[0]) => {
     await api.updateUser(u.id, { isActive: !u.is_active });
     await load();
+  };
+
+  const roleLabel = (u: typeof users[0]) => {
+    if (u.role === 'admin') return 'Administrador';
+    if (u.role === 'supervisor') return 'Supervisor';
+    if (u.role === 'operador') {
+      if (u.operator_type === 'cajero') return 'Cajero';
+      if (u.operator_type === 'barista') return 'Barista';
+      if (u.operator_type === 'cocina') return 'Cocina';
+      return 'Operador';
+    }
+    return u.role;
   };
 
   return (
@@ -572,13 +586,21 @@ function UsersManager() {
             <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
               <select value={form.role} onChange={e => setForm(f => ({ ...f, role: e.target.value }))} style={S.select}>
                 <option value="admin">Admin</option>
-                <option value="manager">Supervisor</option>
-                <option value="cashier">Cajero</option>
-                <option value="barista">Barista (KDS)</option>
-                <option value="kitchen">Cocina (KDS)</option>
+                <option value="supervisor">Supervisor</option>
+                <option value="operador">Operador</option>
               </select>
-              <Tooltip text="Admin/Supervisor: acceso completo. Cajero: solo POS. Barista/Cocina: solo KDS."><span /></Tooltip>
+              <Tooltip text="Admin: acceso total. Supervisor: sin panel admin. Operador: segun tipo."><span /></Tooltip>
             </div>
+            {form.role === 'operador' && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                <select value={form.operatorType} onChange={e => setForm(f => ({ ...f, operatorType: e.target.value }))} style={S.select}>
+                  <option value="cajero">Cajero</option>
+                  <option value="barista">Barista (KDS Barra)</option>
+                  <option value="cocina">Cocina (KDS Cocina)</option>
+                </select>
+                <Tooltip text="Cajero: POS + Ordenes. Barista: auto-redirect KDS Barra. Cocina: auto-redirect KDS Cocina."><span /></Tooltip>
+              </div>
+            )}
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
             <button onClick={handleSave} style={{ ...S.btn, ...S.btnPrimary }}>Crear</button>
@@ -591,7 +613,7 @@ function UsersManager() {
           <div key={u.id} style={{ ...S.item, opacity: u.is_active ? 1 : 0.5 }}>
             <div>
               <div style={S.itemName}>{u.name}</div>
-              <div style={S.itemSub}>{u.role} {!u.is_active && '(Inactivo)'}</div>
+              <div style={S.itemSub}>{roleLabel(u)} {!u.is_active && '(Inactivo)'}</div>
             </div>
             <button onClick={() => toggleActive(u)} style={{ ...S.btn, ...(u.is_active ? S.btnDanger : S.btnPrimary), padding: '4px 8px', fontSize: 11 }}>
               {u.is_active ? 'Desactivar' : 'Activar'}
@@ -876,17 +898,19 @@ function AuditViewer() {
   const [total, setTotal] = useState(0);
   const [filterRole, setFilterRole] = useState('');
   const [filterAction, setFilterAction] = useState('');
-  const [filterDate, setFilterDate] = useState('');
+  const [filterFrom, setFilterFrom] = useState('');
+  const [filterTo, setFilterTo] = useState('');
 
-  const load = (role: string, action: string, date: string) => {
+  const load = (role: string, action: string, from: string, to: string) => {
     const filters: api.AuditFilters = { limit: 200 };
     if (role) filters.role = role;
     if (action) filters.action = action;
-    if (date) filters.date = date;
+    if (from) (filters as any).from = from;
+    if (to) (filters as any).to = to;
     api.fetchAuditLog(filters).then(r => { setLogs(r.logs); setTotal(r.total); });
   };
 
-  useEffect(() => { load(filterRole, filterAction, filterDate); }, [filterRole, filterAction, filterDate]);
+  useEffect(() => { load(filterRole, filterAction, filterFrom, filterTo); }, [filterRole, filterAction, filterFrom, filterTo]);
 
   const actionLabel = (a: string) => {
     const map: Record<string, string> = {
@@ -898,6 +922,8 @@ function AuditViewer() {
       user_created: 'Usuario creado', user_updated: 'Usuario editado',
       recipe_updated: 'Receta editada', modifier_group_created: 'Grupo mod. creado',
       modifier_created: 'Modificador creado', modifier_deleted: 'Modificador eliminado',
+      override_authorized: 'Override autorizado', override_denied: 'Override denegado',
+      order_cancelled: 'Orden cancelada',
     };
     return map[a] || a;
   };
@@ -914,9 +940,12 @@ function AuditViewer() {
   const ACTIONS = [
     { value: '', label: 'Todas las acciones' },
     { value: 'order_created', label: 'Ordenes creadas' },
+    { value: 'order_cancelled', label: 'Ordenes canceladas' },
     { value: 'waste_registered', label: 'Mermas registradas' },
     { value: 'login', label: 'Inicios de sesion' },
     { value: 'login_failed', label: 'Logins fallidos' },
+    { value: 'override_authorized', label: 'Override autorizado' },
+    { value: 'override_denied', label: 'Override denegado' },
     { value: 'product_created', label: 'Productos creados' },
     { value: 'product_updated', label: 'Productos editados' },
     { value: 'inventory_received', label: 'Inventario recibido' },
@@ -926,11 +955,9 @@ function AuditViewer() {
 
   const ROLES = [
     { value: '', label: 'Todos los roles' },
-    { value: 'admin', label: 'Admin' },
-    { value: 'manager', label: 'Manager' },
-    { value: 'cashier', label: 'Cajero' },
-    { value: 'barista', label: 'Barista' },
-    { value: 'kitchen', label: 'Cocina' },
+    { value: 'admin', label: 'Administrador' },
+    { value: 'supervisor', label: 'Supervisor' },
+    { value: 'operador', label: 'Operador' },
   ];
 
   return (
@@ -943,9 +970,16 @@ function AuditViewer() {
         <select value={filterAction} onChange={e => setFilterAction(e.target.value)} style={{ ...S.select, minWidth: 180 }}>
           {ACTIONS.map(a => <option key={a.value} value={a.value}>{a.label}</option>)}
         </select>
-        <input type="date" value={filterDate} onChange={e => setFilterDate(e.target.value)} style={{ ...S.input, width: 160 }} />
-        {(filterRole || filterAction || filterDate) && (
-          <button onClick={() => { setFilterRole(''); setFilterAction(''); setFilterDate(''); }} style={{ ...S.btn, ...S.btnSecondary, fontSize: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)' }}>Desde</label>
+          <input type="datetime-local" value={filterFrom} onChange={e => setFilterFrom(e.target.value)} style={{ ...S.input, width: 200 }} />
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)' }}>Hasta</label>
+          <input type="datetime-local" value={filterTo} onChange={e => setFilterTo(e.target.value)} style={{ ...S.input, width: 200 }} />
+        </div>
+        {(filterRole || filterAction || filterFrom || filterTo) && (
+          <button onClick={() => { setFilterRole(''); setFilterAction(''); setFilterFrom(''); setFilterTo(''); }} style={{ ...S.btn, ...S.btnSecondary, fontSize: 12 }}>
             Limpiar filtros
           </button>
         )}
@@ -993,10 +1027,10 @@ export default function AdminScreen() {
   const [tab, setTab] = useState<AdminTab>('products');
   const { currentUser } = useStore();
 
-  if (currentUser?.role !== 'admin' && currentUser?.role !== 'manager') {
+  if (currentUser?.role !== 'admin') {
     return (
       <div style={{ ...S.container, alignItems: 'center', justifyContent: 'center' }}>
-        <p style={{ color: 'var(--danger)', fontWeight: 600 }}>Acceso denegado. Solo admin/manager pueden acceder.</p>
+        <p style={{ color: 'var(--danger)', fontWeight: 600 }}>Acceso denegado. Solo administradores pueden acceder.</p>
       </div>
     );
   }

@@ -322,10 +322,10 @@ const styles: Record<string, React.CSSProperties> = {
   categoryTab: { padding: '8px 18px', borderRadius: 20, border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: 13 },
 
   // Product grid — compact touch-friendly rectangles
-  grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: 8, flex: 1, alignContent: 'start' },
-  productCard: { display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '12px 14px', borderRadius: 10, border: '1px solid var(--border)', backgroundColor: 'var(--bg-card)', cursor: 'pointer', textAlign: 'left', minHeight: 60, transition: 'box-shadow 0.15s' },
-  productName: { fontWeight: 600, fontSize: 13, color: 'var(--text-primary)', lineHeight: 1.2 },
-  productPrice: { fontWeight: 500, fontSize: 12, color: 'var(--text-muted)', marginTop: 4 },
+  grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 12, flex: 1, alignContent: 'start' },
+  productCard: { display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '20px 22px', borderRadius: 14, border: '1px solid var(--border)', backgroundColor: 'var(--bg-card)', cursor: 'pointer', textAlign: 'left', minHeight: 120, transition: 'box-shadow 0.15s' },
+  productName: { fontWeight: 700, fontSize: 18, color: 'var(--text-primary)', lineHeight: 1.3 },
+  productPrice: { fontWeight: 600, fontSize: 16, color: 'var(--text-muted)', marginTop: 6 },
 
   // Cart — strict 25vw of screen, compact sidebar
   cartPanel: { width: '25vw', maxWidth: '25vw', minWidth: 220, backgroundColor: 'var(--bg-secondary)', borderLeft: '1px solid var(--border)', display: 'flex', flexDirection: 'column', height: '100%', flexShrink: 0, flexGrow: 0, flexBasis: '25vw' },

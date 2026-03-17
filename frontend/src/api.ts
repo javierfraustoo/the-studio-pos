@@ -35,11 +35,17 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
 
 // ─── Auth ───────────────────────────────────────────────────────────────
 
-export interface UserInfo { id: string; name: string; role: string; }
+export interface UserInfo { id: string; name: string; role: string; operator_type?: string; }
 export function fetchUsersList() { return request<UserInfo[]>('/api/auth/users-list'); }
 export function loginWithPin(userId: string, pin: string) {
   return request<{ token: string; user: UserInfo }>('/api/auth/login', {
     method: 'POST', body: JSON.stringify({ userId, pin }),
+  });
+}
+export function verifyOverride(pin: string, action: string, details?: any) {
+  return request<{ authorized: boolean; overrideUser?: { id: string; name: string; role: string } }>('/api/auth/verify-override', {
+    method: 'POST',
+    body: JSON.stringify({ pin, action, details }),
   });
 }
 
@@ -102,7 +108,8 @@ export interface Order {
   id: string; order_number: number; customer_name: string;
   order_type: string; payment_method: string;
   subtotal: number; total: number; created_at: string;
-  user_name?: string;
+  user_name?: string; status?: string;
+  discount?: number; discount_authorized_by?: string;
   items: OrderItem[];
 }
 export interface CreateOrderItem {
@@ -121,6 +128,12 @@ export function fetchOrders(date?: string) {
 export function createOrder(payload: CreateOrderPayload) {
   return request<Order & { kdsItems: KdsItem[] }>('/api/orders', {
     method: 'POST', body: JSON.stringify(payload),
+  });
+}
+export function cancelOrder(orderId: string, authorizedBy?: string) {
+  return request<{ ok: boolean }>(`/api/orders/${orderId}/cancel`, {
+    method: 'PATCH',
+    body: JSON.stringify({ authorizedBy }),
   });
 }
 
@@ -203,6 +216,7 @@ export interface AuditEntry {
 export interface AuditFilters {
   limit?: number; offset?: number; action?: string; userId?: string;
   entityType?: string; role?: string; date?: string;
+  from?: string; to?: string;
 }
 export function fetchAuditLog(filters: AuditFilters = {}) {
   const params = new URLSearchParams();
@@ -213,6 +227,8 @@ export function fetchAuditLog(filters: AuditFilters = {}) {
   if (filters.entityType) params.set('entityType', filters.entityType);
   if (filters.role) params.set('role', filters.role);
   if (filters.date) params.set('date', filters.date);
+  if (filters.from) params.set('from', filters.from);
+  if (filters.to) params.set('to', filters.to);
   return request<{ logs: AuditEntry[]; total: number }>(`/api/audit?${params.toString()}`);
 }
 
@@ -295,11 +311,11 @@ export function deleteInventoryItem(id: string) {
 
 // Users
 export function fetchUsers() {
-  return request<Array<{ id: string; name: string; role: string; is_active: number; created_at: string }>>('/api/admin/users');
+  return request<Array<{ id: string; name: string; role: string; operator_type?: string | null; is_active: number; created_at: string }>>('/api/admin/users');
 }
-export function createUser(data: { name: string; pin: string; role: string }) {
-  return request<{ id: string; name: string; role: string }>('/api/admin/users', { method: 'POST', body: JSON.stringify(data) });
+export function createUser(data: { name: string; pin: string; role: string; operatorType?: string }) {
+  return request<{ id: string; name: string; role: string; operator_type?: string }>('/api/admin/users', { method: 'POST', body: JSON.stringify(data) });
 }
-export function updateUser(id: string, data: Partial<{ name: string; pin: string; role: string; isActive: boolean }>) {
-  return request<{ id: string; name: string; role: string }>(`/api/admin/users/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+export function updateUser(id: string, data: Partial<{ name: string; pin: string; role: string; operatorType: string; isActive: boolean }>) {
+  return request<{ id: string; name: string; role: string; operator_type?: string }>(`/api/admin/users/${id}`, { method: 'PUT', body: JSON.stringify(data) });
 }

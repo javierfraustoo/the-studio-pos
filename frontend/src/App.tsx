@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { useStore } from './store/useStore';
 import type { TabId } from './store/useStore';
-import socket from './socket';
+import { subscribePosEvents, unsubscribe } from './realtime';
 
 import LoginScreen from './components/LoginScreen';
 import POSScreen from './components/POSScreen';
@@ -37,6 +37,36 @@ function DarkModeToggle() {
   );
 }
 
+// ─── Role helper functions ───────────────────────────────────────────────
+
+function isKdsOnlyUser(user: { role: string; operator_type?: string | null }) {
+  return user.role === 'operador' && (user.operator_type === 'barista' || user.operator_type === 'cocina');
+}
+
+function canAccessTab(user: { role: string; operator_type?: string | null }, tabId: TabId): boolean {
+  const { role, operator_type } = user;
+
+  // Admin: full access
+  if (role === 'admin') return true;
+
+  // Supervisor: everything except admin panel
+  if (role === 'supervisor') return tabId !== 'admin';
+
+  // Operador depends on operator_type
+  if (role === 'operador') {
+    // Barista/Cocina: KDS + waste only (handled separately via redirect)
+    if (operator_type === 'barista' || operator_type === 'cocina') {
+      return tabId === 'kds' || tabId === 'waste';
+    }
+    // Cajero: POS, orders, waste, KDS
+    if (operator_type === 'cajero') {
+      return ['pos', 'kds', 'orders', 'waste'].includes(tabId);
+    }
+  }
+
+  return false;
+}
+
 // ─── Main POS App (tabbed) ──────────────────────────────────────────────────
 
 function MainApp() {
@@ -55,18 +85,17 @@ function MainApp() {
     if (isAuthenticated) init();
   }, [isAuthenticated]);
 
+  // Supabase Realtime subscriptions (replaces Socket.io)
   useEffect(() => {
-    socket.on('kds:new-item', addKdsItem);
-    socket.on('kds:item-updated', updateKdsItemLocal);
-    socket.on('order:created', () => { fetchOrders(); fetchAnalytics(); });
-    socket.on('waste:created', () => { fetchInventory(); fetchAnalytics(); });
-    socket.on('menu:updated', () => { reloadMenu(); });
+    const channel = subscribePosEvents({
+      onOrderCreated: () => { fetchOrders(); fetchAnalytics(); },
+      onWasteCreated: () => { fetchInventory(); fetchAnalytics(); },
+      onMenuUpdated: () => { reloadMenu(); },
+      onOrderComplete: () => { fetchOrders(); },
+    });
+
     return () => {
-      socket.off('kds:new-item');
-      socket.off('kds:item-updated');
-      socket.off('order:created');
-      socket.off('waste:created');
-      socket.off('menu:updated');
+      unsubscribe(channel);
     };
   }, []);
 
@@ -75,11 +104,10 @@ function MainApp() {
     return <LoginScreen />;
   }
 
-  // Barista/Kitchen auto-redirect to their KDS
-  const isKdsOnlyRole = currentUser?.role === 'barista' || currentUser?.role === 'kitchen';
-  if (isKdsOnlyRole) {
-    const station = currentUser?.role === 'barista' ? 'bar' : 'kitchen';
-    const title = currentUser?.role === 'barista' ? 'KDS Barra' : 'KDS Cocina';
+  // Barista/Cocina auto-redirect to their KDS
+  if (currentUser && isKdsOnlyUser(currentUser)) {
+    const station = currentUser.operator_type === 'barista' ? 'bar' : 'kitchen';
+    const title = currentUser.operator_type === 'barista' ? 'KDS Barra' : 'KDS Cocina';
     return (
       <div style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 16px', backgroundColor: 'var(--accent)' }}>
@@ -108,19 +136,25 @@ function MainApp() {
     );
   }
 
-  const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'manager';
+  // Role label for display
+  const roleLabel = currentUser?.role === 'admin' ? 'Administrador'
+    : currentUser?.role === 'supervisor' ? 'Supervisor'
+    : currentUser?.operator_type === 'cajero' ? 'Cajero'
+    : currentUser?.operator_type === 'barista' ? 'Barista'
+    : currentUser?.operator_type === 'cocina' ? 'Cocina'
+    : 'Operador';
 
-  const tabs: Array<{ id: TabId; label: string; icon: string; roles?: string[] }> = [
+  const tabs: Array<{ id: TabId; label: string; icon: string }> = [
     { id: 'pos', label: 'POS', icon: '▢' },
     { id: 'kds', label: 'KDS', icon: '📺' },
     { id: 'orders', label: 'Ordenes', icon: '☰' },
     { id: 'inventory', label: 'Inventario', icon: '⚙' },
     { id: 'waste', label: 'Merma', icon: '🗑' },
-    { id: 'analytics', label: 'Analisis', icon: '📊', roles: ['admin', 'manager'] },
-    { id: 'admin', label: 'Admin', icon: '🔧', roles: ['admin', 'manager'] },
+    { id: 'analytics', label: 'Analisis', icon: '📊' },
+    { id: 'admin', label: 'Admin', icon: '🔧' },
   ];
 
-  const visibleTabs = tabs.filter(t => !t.roles || (currentUser && t.roles.includes(currentUser.role)));
+  const visibleTabs = currentUser ? tabs.filter(t => canAccessTab(currentUser, t.id)) : [];
 
   const showHW = showSimulators && activeTab === 'pos';
 
@@ -131,7 +165,7 @@ function MainApp() {
           <span style={styles.diamond}>&#9670;</span>
           <span style={styles.brandName}>THE STUDIO</span>
           <span style={styles.posBadge}>POS</span>
-          <span style={styles.version}>v3</span>
+          <span style={styles.version}>v4</span>
         </div>
         <nav style={styles.nav}>
           {visibleTabs.map((t) => (
@@ -152,7 +186,7 @@ function MainApp() {
           ))}
         </nav>
         <div style={styles.headerRight}>
-          <span style={styles.userInfo}>{currentUser?.name} ({currentUser?.role})</span>
+          <span style={styles.userInfo}>{currentUser?.name} ({roleLabel})</span>
           <DarkModeToggle />
           <button onClick={toggleSimulators} style={styles.hwToggle}>
             {showSimulators ? 'Ocultar' : 'HW'}

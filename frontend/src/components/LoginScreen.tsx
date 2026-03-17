@@ -36,26 +36,25 @@ export default function LoginScreen() {
 
   const handleBack = () => { setSelectedUser(null); setPin(''); setError(''); };
 
-  const roleLabel = (r: string) => {
-    switch (r) {
-      case 'admin': return 'Administrador';
-      case 'manager': return 'Supervisor';
-      case 'cashier': return 'Cajero';
-      case 'barista': return 'Barista';
-      case 'kitchen': return 'Cocina';
-      default: return r;
+  const roleLabel = (u: UserInfo) => {
+    if (u.role === 'admin') return 'Administrador';
+    if (u.role === 'supervisor') return 'Supervisor';
+    if (u.role === 'operador') {
+      if (u.operator_type === 'cajero') return 'Cajero';
+      if (u.operator_type === 'barista') return 'Barista';
+      if (u.operator_type === 'cocina') return 'Cocina';
+      return 'Operador';
     }
+    return u.role;
   };
 
-  const roleColor = (r: string) => {
-    switch (r) {
-      case 'admin': return '#7C3AED';
-      case 'manager': return '#D97706';
-      case 'cashier': return '#2563EB';
-      case 'barista': return '#78350F';
-      case 'kitchen': return '#065F46';
-      default: return '#6B7280';
-    }
+  const roleColor = (u: UserInfo) => {
+    if (u.role === 'admin') return '#7C3AED';
+    if (u.role === 'supervisor') return '#D97706';
+    if (u.operator_type === 'cajero') return '#2563EB';
+    if (u.operator_type === 'barista') return '#78350F';
+    if (u.operator_type === 'cocina') return '#065F46';
+    return '#6B7280';
   };
 
   // User Selection
@@ -72,11 +71,11 @@ export default function LoginScreen() {
           <div style={styles.userGrid}>
             {availableUsers.map(u => (
               <button key={u.id} onClick={() => setSelectedUser(u)} style={styles.userBtn}>
-                <div style={{ ...styles.userAvatar, backgroundColor: roleColor(u.role) }}>
+                <div style={{ ...styles.userAvatar, backgroundColor: roleColor(u) }}>
                   {u.name.charAt(0).toUpperCase()}
                 </div>
                 <span style={styles.userName}>{u.name}</span>
-                <span style={{ ...styles.userRole, color: roleColor(u.role) }}>{roleLabel(u.role)}</span>
+                <span style={{ ...styles.userRole, color: roleColor(u) }}>{roleLabel(u)}</span>
               </button>
             ))}
           </div>
@@ -90,7 +89,7 @@ export default function LoginScreen() {
     <div style={styles.page}>
       <div style={styles.container}>
         <button onClick={handleBack} style={styles.backBtn}>&#8592; Cambiar usuario</button>
-        <div style={{ ...styles.userAvatar, backgroundColor: roleColor(selectedUser.role), width: 64, height: 64, fontSize: 28, margin: '0 auto 12px' }}>
+        <div style={{ ...styles.userAvatar, backgroundColor: roleColor(selectedUser), width: 64, height: 64, fontSize: 28, margin: '0 auto 12px' }}>
           {selectedUser.name.charAt(0).toUpperCase()}
         </div>
         <h2 style={styles.pinTitle}>{selectedUser.name}</h2>

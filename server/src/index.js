@@ -1,17 +1,13 @@
 const express = require('express');
-const http = require('http');
 const path = require('path');
 const fs = require('fs');
-const { Server } = require('socket.io');
 const cors = require('cors');
 const { v4: uuid } = require('uuid');
-const { initDatabase, getDb, seedIfEmpty, deductFifo, resolveRecipe, logAudit, hashPin } = require('./db');
+const { supabase, deductFifo, resolveRecipe, logAudit, hashPin, seedIfEmpty } = require('./supabase');
 const { createToken, authMiddleware, requireRole } = require('./middleware/auth');
 
 const PORT = process.env.PORT || 3001;
 const app = express();
-const server = http.createServer(app);
-const io = new Server(server, { cors: { origin: '*' }, transports: ['websocket', 'polling'] });
 
 app.use(cors());
 app.use(express.json());
@@ -23,7 +19,7 @@ if (fs.existsSync(FRONTEND_DIST)) {
 }
 
 // Health check (no auth)
-app.get('/health', (_req, res) => res.json({ status: 'ok', version: '3.0.0' }));
+app.get('/health', (_req, res) => res.json({ status: 'ok', version: '4.0.0-supabase' }));
 
 // Auth middleware for all /api routes
 app.use('/api', authMiddleware);
@@ -32,240 +28,418 @@ app.use('/api', authMiddleware);
 // AUTH
 // ═══════════════════════════════════════════════════════════════════════════
 
-// Get users list (for login screen — no auth needed, only returns names+roles)
-app.get('/api/auth/users-list', (_req, res) => {
-  const db = getDb();
-  const users = db.prepare(`SELECT id, name, role FROM users WHERE is_active = 1 ORDER BY name`).all();
-  res.json(users);
+app.get('/api/auth/users-list', async (_req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('users')
+      .select('id, name, role, operator_type')
+      .eq('is_active', true)
+      .order('name');
+    if (error) throw error;
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-// Login with PIN
-app.post('/api/auth/login', (req, res) => {
-  const db = getDb();
+app.post('/api/auth/login', async (req, res) => {
   const { userId, pin } = req.body;
   if (!userId || !pin) return res.status(400).json({ error: 'Missing userId or pin' });
 
-  const user = db.prepare('SELECT id, name, role, pin_hash, is_active FROM users WHERE id = ?').get(userId);
-  if (!user || !user.is_active) return res.status(401).json({ error: 'User not found' });
+  try {
+    const { data: user, error } = await supabase
+      .from('users')
+      .select('id, name, role, operator_type, pin_hash, is_active')
+      .eq('id', userId)
+      .single();
 
-  if (user.pin_hash !== hashPin(pin)) {
-    logAudit(userId, user.name, 'login_failed', 'user', userId, { reason: 'wrong_pin' });
-    return res.status(401).json({ error: 'PIN incorrecto' });
+    if (error || !user || !user.is_active) {
+      return res.status(401).json({ error: 'User not found' });
+    }
+
+    if (user.pin_hash !== hashPin(pin)) {
+      await logAudit(userId, user.name, 'login_failed', 'user', userId, { reason: 'wrong_pin' });
+      return res.status(401).json({ error: 'PIN incorrecto' });
+    }
+
+    const token = createToken({ userId: user.id, role: user.role });
+    await logAudit(user.id, user.name, 'login', 'user', user.id, null);
+    res.json({ token, user: { id: user.id, name: user.name, role: user.role, operator_type: user.operator_type } });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
-
-  const token = createToken({ userId: user.id, role: user.role });
-  logAudit(user.id, user.name, 'login', 'user', user.id, null);
-  res.json({ token, user: { id: user.id, name: user.name, role: user.role } });
 });
 
-// Get current user info
 app.get('/api/auth/me', (req, res) => {
   res.json(req.user);
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// MANAGER OVERRIDE — Verify PIN for restricted actions
+// ═══════════════════════════════════════════════════════════════════════════
+
+app.post('/api/auth/verify-override', async (req, res) => {
+  const { pin, action, details } = req.body;
+  if (!pin) return res.status(400).json({ error: 'PIN required' });
+
+  try {
+    const pinHash = hashPin(pin);
+    const { data: overrideUser, error } = await supabase
+      .from('users')
+      .select('id, name, role')
+      .in('role', ['admin', 'supervisor'])
+      .eq('pin_hash', pinHash)
+      .eq('is_active', true)
+      .limit(1)
+      .single();
+
+    if (error || !overrideUser) {
+      await logAudit(req.user?.id, req.user?.name, 'override_denied', 'override', null, { action, details, reason: 'invalid_pin' });
+      return res.json({ authorized: false });
+    }
+
+    await logAudit(overrideUser.id, overrideUser.name, 'override_authorized', 'override', null, {
+      action,
+      details,
+      requestedBy: req.user?.name,
+      requestedById: req.user?.id,
+    });
+
+    res.json({ authorized: true, overrideUser: { id: overrideUser.id, name: overrideUser.name, role: overrideUser.role } });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
 // MENU
 // ═══════════════════════════════════════════════════════════════════════════
 
-app.get('/api/menu', (_req, res) => {
-  const db = getDb();
-  const categories = db.prepare(`SELECT * FROM categories WHERE deleted_at IS NULL ORDER BY sort_order`).all();
-  const products = db.prepare(`SELECT * FROM products WHERE deleted_at IS NULL ORDER BY name`).all().map(p => ({
-    ...p,
-    modifierGroupIds: JSON.parse(p.modifier_group_ids),
-    recipe: db.prepare(`SELECT inventory_item_id, quantity FROM recipes WHERE product_id = ?`).all(p.id),
-  }));
+app.get('/api/menu', async (_req, res) => {
+  try {
+    const { data: categories } = await supabase
+      .from('categories')
+      .select('*')
+      .is('deleted_at', null)
+      .order('sort_order');
 
-  const modifierGroups = db.prepare(`SELECT * FROM modifier_groups WHERE deleted_at IS NULL`).all().map(g => ({
-    ...g,
-    isRequired: !!g.is_required,
-    selectionType: g.selection_type,
-    minSelections: g.min_selections,
-    maxSelections: g.max_selections,
-    modifiers: db.prepare(`SELECT * FROM modifiers WHERE group_id = ? AND deleted_at IS NULL`).all(g.id).map(m => ({
-      ...m,
-      priceAdjustment: m.price_adjustment,
-      shortName: m.short_name,
-      isDefault: !!m.is_default,
-    })),
-  }));
+    const { data: rawProducts } = await supabase
+      .from('products')
+      .select('*')
+      .is('deleted_at', null)
+      .order('name');
 
-  const modifierRecipeAdjustments = db.prepare(`SELECT * FROM modifier_recipe_adjustments`).all().map(a => ({
-    modifierId: a.modifier_id,
-    inventoryItemId: a.inventory_item_id,
-    quantity: a.quantity,
-    replacesInventoryItemId: a.replaces_inventory_item_id,
-  }));
+    const { data: allRecipes } = await supabase.from('recipes').select('*');
+    const { data: rawGroups } = await supabase.from('modifier_groups').select('*').is('deleted_at', null);
+    const { data: rawModifiers } = await supabase.from('modifiers').select('*').is('deleted_at', null);
+    const { data: rawAdjustments } = await supabase.from('modifier_recipe_adjustments').select('*');
 
-  res.json({ categories, products, modifierGroups, modifierRecipeAdjustments });
+    const products = (rawProducts || []).map(p => ({
+      ...p,
+      modifierGroupIds: p.modifier_group_ids || [],
+      recipe: (allRecipes || []).filter(r => r.product_id === p.id).map(r => ({ inventory_item_id: r.inventory_item_id, quantity: r.quantity })),
+    }));
+
+    const modifierGroups = (rawGroups || []).map(g => ({
+      ...g,
+      isRequired: !!g.is_required,
+      selectionType: g.selection_type,
+      minSelections: g.min_selections,
+      maxSelections: g.max_selections,
+      modifiers: (rawModifiers || []).filter(m => m.group_id === g.id).map(m => ({
+        ...m,
+        priceAdjustment: parseFloat(m.price_adjustment) || 0,
+        shortName: m.short_name,
+        isDefault: !!m.is_default,
+      })),
+    }));
+
+    const modifierRecipeAdjustments = (rawAdjustments || []).map(a => ({
+      modifierId: a.modifier_id,
+      inventoryItemId: a.inventory_item_id,
+      quantity: a.quantity,
+      replacesInventoryItemId: a.replaces_inventory_item_id,
+    }));
+
+    res.json({ categories, products, modifierGroups, modifierRecipeAdjustments });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
 // INVENTORY
 // ═══════════════════════════════════════════════════════════════════════════
 
-app.get('/api/inventory', (_req, res) => {
-  const db = getDb();
-  const items = db.prepare(`SELECT * FROM inventory_items WHERE deleted_at IS NULL`).all();
-  const result = items.map(item => {
-    const batches = db.prepare(`
-      SELECT id, quantity_received, quantity_remaining, cost_per_unit, received_at, expires_at
-      FROM inventory_batches
-      WHERE inventory_item_id = ? AND quantity_remaining > 0
-      ORDER BY received_at ASC
-    `).all(item.id);
-    const stock = batches.reduce((s, b) => s + b.quantity_remaining, 0);
-    return { ...item, isPerishable: !!item.is_perishable, minimumStock: item.minimum_stock, stock, batches };
-  });
-  res.json(result);
+app.get('/api/inventory', async (_req, res) => {
+  try {
+    const { data: items } = await supabase.from('inventory_items').select('*').is('deleted_at', null);
+    const { data: allBatches } = await supabase
+      .from('inventory_batches')
+      .select('*')
+      .gt('quantity_remaining', 0)
+      .order('received_at');
+
+    const result = (items || []).map(item => {
+      const batches = (allBatches || []).filter(b => b.inventory_item_id === item.id);
+      const stock = batches.reduce((s, b) => s + parseFloat(b.quantity_remaining), 0);
+      return { ...item, isPerishable: !!item.is_perishable, minimumStock: parseFloat(item.minimum_stock), stock, batches };
+    });
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-app.post('/api/inventory/receive', (req, res) => {
-  const db = getDb();
+app.post('/api/inventory/receive', async (req, res) => {
   const { inventoryItemId, quantity, costPerUnit, expiresAt } = req.body;
   if (!inventoryItemId || !quantity) return res.status(400).json({ error: 'Missing fields' });
 
-  db.prepare(`
-    INSERT INTO inventory_batches (inventory_item_id, quantity_received, quantity_remaining, cost_per_unit, received_at, expires_at)
-    VALUES (?, ?, ?, ?, datetime('now','localtime'), ?)
-  `).run(inventoryItemId, quantity, quantity, costPerUnit || 0, expiresAt || null);
+  try {
+    await supabase.from('inventory_batches').insert({
+      inventory_item_id: inventoryItemId,
+      quantity_received: quantity,
+      quantity_remaining: quantity,
+      cost_per_unit: costPerUnit || 0,
+      expires_at: expiresAt || null,
+    });
 
-  logAudit(req.user?.id, req.user?.name, 'inventory_received', 'inventory_item', inventoryItemId, { quantity, costPerUnit });
-  res.json({ ok: true });
+    await logAudit(req.user?.id, req.user?.name, 'inventory_received', 'inventory_item', inventoryItemId, { quantity, costPerUnit });
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
 // ORDERS
 // ═══════════════════════════════════════════════════════════════════════════
 
-app.get('/api/orders', (req, res) => {
-  const db = getDb();
-  const date = req.query.date || new Date().toISOString().slice(0, 10);
-  const orders = db.prepare(`SELECT * FROM orders WHERE date(created_at) = ? ORDER BY created_at DESC`).all(date);
+app.get('/api/orders', async (req, res) => {
+  try {
+    const date = req.query.date || new Date().toISOString().slice(0, 10);
+    const dayStart = `${date}T00:00:00`;
+    const dayEnd = `${date}T23:59:59`;
 
-  const result = orders.map(order => {
-    const items = db.prepare(`SELECT * FROM order_items WHERE order_id = ?`).all(order.id).map(item => ({
+    const { data: orders } = await supabase
+      .from('orders')
+      .select('*')
+      .gte('created_at', dayStart)
+      .lte('created_at', dayEnd)
+      .order('created_at', { ascending: false });
+
+    if (!orders || orders.length === 0) return res.json([]);
+
+    const orderIds = orders.map(o => o.id);
+    const { data: allItems } = await supabase.from('order_items').select('*').in('order_id', orderIds);
+    const itemIds = (allItems || []).map(i => i.id);
+    const { data: allMods } = itemIds.length > 0
+      ? await supabase.from('order_item_modifiers').select('*').in('order_item_id', itemIds)
+      : { data: [] };
+
+    const result = orders.map(order => {
+      const items = (allItems || []).filter(i => i.order_id === order.id).map(item => ({
+        ...item,
+        modifiers: (allMods || []).filter(m => m.order_item_id === item.id).map(m => ({
+          id: m.modifier_id, name: m.modifier_name, shortName: m.short_name, priceAdjustment: parseFloat(m.price_adjustment),
+        })),
+      }));
+      return { ...order, items };
+    });
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/orders/:id', async (req, res) => {
+  try {
+    const { data: order, error } = await supabase.from('orders').select('*').eq('id', req.params.id).single();
+    if (error || !order) return res.status(404).json({ error: 'Order not found' });
+
+    const { data: rawItems } = await supabase.from('order_items').select('*').eq('order_id', order.id);
+    const itemIds = (rawItems || []).map(i => i.id);
+    const { data: allMods } = itemIds.length > 0
+      ? await supabase.from('order_item_modifiers').select('*').in('order_item_id', itemIds)
+      : { data: [] };
+
+    const items = (rawItems || []).map(item => ({
       ...item,
-      modifiers: db.prepare(`SELECT * FROM order_item_modifiers WHERE order_item_id = ?`).all(item.id).map(m => ({
-        id: m.modifier_id, name: m.modifier_name, shortName: m.short_name, priceAdjustment: m.price_adjustment,
+      modifiers: (allMods || []).filter(m => m.order_item_id === item.id).map(m => ({
+        id: m.modifier_id, name: m.modifier_name, shortName: m.short_name, priceAdjustment: parseFloat(m.price_adjustment),
       })),
     }));
-    return { ...order, items };
-  });
-  res.json(result);
+
+    const { data: deductions } = await supabase.rpc('get_order_deductions', { p_order_id: order.id }).catch(() => ({ data: [] }));
+
+    res.json({ ...order, items, deductions: deductions || [] });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-app.get('/api/orders/:id', (req, res) => {
-  const db = getDb();
-  const order = db.prepare(`SELECT * FROM orders WHERE id = ?`).get(req.params.id);
-  if (!order) return res.status(404).json({ error: 'Order not found' });
-
-  const items = db.prepare(`SELECT * FROM order_items WHERE order_id = ?`).all(order.id).map(item => ({
-    ...item,
-    modifiers: db.prepare(`SELECT * FROM order_item_modifiers WHERE order_item_id = ?`).all(item.id).map(m => ({
-      id: m.modifier_id, name: m.modifier_name, shortName: m.short_name, priceAdjustment: m.price_adjustment,
-    })),
-  }));
-
-  const deductions = db.prepare(`
-    SELECT im.inventory_item_id, ii.name as item_name, ii.unit, SUM(ABS(im.quantity)) as total_qty, SUM(im.cost) as total_cost
-    FROM inventory_movements im
-    JOIN inventory_items ii ON ii.id = im.inventory_item_id
-    WHERE im.reference_id = ? AND im.movement_type = 'sale'
-    GROUP BY im.inventory_item_id
-  `).all(order.id);
-
-  res.json({ ...order, items, deductions });
-});
-
-app.post('/api/orders', (req, res) => {
-  const db = getDb();
-  const { items, paymentMethod, customerName, orderType } = req.body;
+app.post('/api/orders', async (req, res) => {
+  const { items, paymentMethod, customerName, orderType, discount, discountAuthorizedBy } = req.body;
   if (!items || !items.length) return res.status(400).json({ error: 'No items' });
 
   try {
-    const result = db.transaction(() => {
-      const today = new Date().toISOString().slice(0, 10);
-      const maxRow = db.prepare(`SELECT COALESCE(MAX(order_number), 0) as maxNum FROM orders WHERE date(created_at) = ?`).get(today);
-      const orderNumber = (maxRow?.maxNum || 0) + 1;
+    const today = new Date().toISOString().slice(0, 10);
+    const dayStart = `${today}T00:00:00`;
+    const dayEnd = `${today}T23:59:59`;
 
-      let subtotal = 0;
-      for (const item of items) subtotal += item.lineTotal;
+    const { data: maxRow } = await supabase
+      .from('orders')
+      .select('order_number')
+      .gte('created_at', dayStart)
+      .lte('created_at', dayEnd)
+      .order('order_number', { ascending: false })
+      .limit(1)
+      .single();
 
-      const orderId = uuid();
-      db.prepare(`
-        INSERT INTO orders (id, order_number, customer_name, order_type, payment_method, subtotal, total, user_id, user_name, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now','localtime'))
-      `).run(orderId, orderNumber, customerName || '', orderType || 'dine_in', paymentMethod, subtotal, subtotal,
-        req.user?.id || null, req.user?.name || null);
+    const orderNumber = (maxRow?.order_number || 0) + 1;
 
-      let recipeCost = 0;
+    let subtotal = 0;
+    for (const item of items) subtotal += item.lineTotal;
 
-      for (const item of items) {
-        const oiResult = db.prepare(`
-          INSERT INTO order_items (order_id, product_id, product_name, quantity, unit_price, modifiers_total, line_total, notes)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        `).run(orderId, item.productId, item.productName, item.quantity, item.unitPrice, item.modifiersTotal || 0, item.lineTotal, item.notes || '');
+    const discountAmount = parseFloat(discount) || 0;
+    const total = subtotal - discountAmount;
 
-        const orderItemId = oiResult.lastInsertRowid;
+    const orderId = uuid();
+    const { error: orderErr } = await supabase.from('orders').insert({
+      id: orderId,
+      order_number: orderNumber,
+      customer_name: customerName || '',
+      order_type: orderType || 'dine_in',
+      payment_method: paymentMethod,
+      subtotal,
+      total,
+      discount: discountAmount,
+      discount_authorized_by: discountAuthorizedBy || null,
+      user_id: req.user?.id || null,
+      user_name: req.user?.name || null,
+    });
+    if (orderErr) throw orderErr;
 
-        for (const mod of (item.modifiers || [])) {
-          db.prepare(`
-            INSERT INTO order_item_modifiers (order_item_id, modifier_id, modifier_name, short_name, price_adjustment)
-            VALUES (?, ?, ?, ?, ?)
-          `).run(orderItemId, mod.id, mod.name, mod.shortName || '', mod.priceAdjustment || 0);
-        }
+    let recipeCost = 0;
+    const kdsItemsToInsert = [];
 
-        const modifierIds = (item.modifiers || []).map(m => m.id);
-        const materials = resolveRecipe(item.productId, modifierIds);
+    for (const item of items) {
+      const { data: oiData, error: oiErr } = await supabase.from('order_items').insert({
+        order_id: orderId,
+        product_id: item.productId,
+        product_name: item.productName,
+        quantity: item.quantity,
+        unit_price: item.unitPrice,
+        modifiers_total: item.modifiersTotal || 0,
+        line_total: item.lineTotal,
+        notes: item.notes || '',
+      }).select('id').single();
+      if (oiErr) throw oiErr;
 
-        for (const [invItemId, qty] of materials) {
-          const totalQty = qty * item.quantity;
-          const { totalCost } = deductFifo(invItemId, totalQty, 'sale', orderId);
-          recipeCost += totalCost;
-        }
+      const orderItemId = oiData.id;
 
-        const product = db.prepare(`SELECT category_id FROM products WHERE id = ?`).get(item.productId);
-        const category = product ? db.prepare(`SELECT kds_station FROM categories WHERE id = ?`).get(product.category_id) : null;
-        const station = category?.kds_station || 'bar';
-
-        if (station !== 'none') {
-          const kdsId = uuid();
-          db.prepare(`
-            INSERT INTO kds_items (id, order_id, order_item_id, order_number, customer_name, order_type, product_name, quantity, modifiers_json, notes, station, status, routed_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', datetime('now','localtime'))
-          `).run(kdsId, orderId, orderItemId, orderNumber, customerName || '', orderType || 'dine_in', item.productName, item.quantity, JSON.stringify((item.modifiers || []).map(m => m.shortName || m.name)), item.notes || '', station);
-        }
+      if (item.modifiers && item.modifiers.length > 0) {
+        await supabase.from('order_item_modifiers').insert(
+          item.modifiers.map(mod => ({
+            order_item_id: orderItemId,
+            modifier_id: mod.id,
+            modifier_name: mod.name,
+            short_name: mod.shortName || '',
+            price_adjustment: mod.priceAdjustment || 0,
+          }))
+        );
       }
 
-      const order = db.prepare(`SELECT * FROM orders WHERE id = ?`).get(orderId);
-      const orderItems = db.prepare(`SELECT * FROM order_items WHERE order_id = ?`).all(orderId).map(oi => ({
-        ...oi,
-        modifiers: db.prepare(`SELECT * FROM order_item_modifiers WHERE order_item_id = ?`).all(oi.id).map(m => ({
-          id: m.modifier_id, name: m.modifier_name, shortName: m.short_name, priceAdjustment: m.price_adjustment,
-        })),
-      }));
+      // FIFO deduction
+      const modifierIds = (item.modifiers || []).map(m => m.id);
+      const materials = await resolveRecipe(item.productId, modifierIds);
 
-      const kdsItems = db.prepare(`SELECT * FROM kds_items WHERE order_id = ?`).all(orderId).map(k => ({
-        ...k, modifiers: JSON.parse(k.modifiers_json),
-      }));
+      for (const [invItemId, qty] of materials) {
+        const totalQty = qty * item.quantity;
+        const result = await deductFifo(invItemId, totalQty, 'sale', orderId);
+        recipeCost += (result.totalCost || 0);
+      }
 
-      logAudit(req.user?.id, req.user?.name, 'order_created', 'order', orderId,
-        { orderNumber, total: subtotal, items: items.length, paymentMethod });
+      // KDS routing
+      const { data: product } = await supabase.from('products').select('category_id').eq('id', item.productId).single();
+      const { data: category } = product
+        ? await supabase.from('categories').select('kds_station').eq('id', product.category_id).single()
+        : { data: null };
+      const station = category?.kds_station || 'bar';
 
-      return { ...order, items: orderItems, kdsItems, recipeCost };
-    })();
-
-    if (result.kdsItems) {
-      for (const kdsItem of result.kdsItems) {
-        io.to(`kds:${kdsItem.station}`).emit('kds:new-item', kdsItem);
+      if (station !== 'none') {
+        const kdsId = uuid();
+        kdsItemsToInsert.push({
+          id: kdsId,
+          order_id: orderId,
+          order_item_id: orderItemId,
+          order_number: orderNumber,
+          customer_name: customerName || '',
+          order_type: orderType || 'dine_in',
+          product_name: item.productName,
+          quantity: item.quantity,
+          modifiers_json: (item.modifiers || []).map(m => m.shortName || m.name),
+          notes: item.notes || '',
+          station,
+          status: 'pending',
+        });
       }
     }
-    io.emit('order:created', { id: result.id, orderNumber: result.order_number });
 
-    res.json(result);
+    // Insert KDS items
+    if (kdsItemsToInsert.length > 0) {
+      await supabase.from('kds_items').insert(kdsItemsToInsert);
+    }
+
+    // Fetch the created order with items
+    const { data: order } = await supabase.from('orders').select('*').eq('id', orderId).single();
+    const { data: orderItems } = await supabase.from('order_items').select('*').eq('order_id', orderId);
+    const oiIds = (orderItems || []).map(oi => oi.id);
+    const { data: orderMods } = oiIds.length > 0
+      ? await supabase.from('order_item_modifiers').select('*').in('order_item_id', oiIds)
+      : { data: [] };
+
+    const formattedItems = (orderItems || []).map(oi => ({
+      ...oi,
+      modifiers: (orderMods || []).filter(m => m.order_item_id === oi.id).map(m => ({
+        id: m.modifier_id, name: m.modifier_name, shortName: m.short_name, priceAdjustment: parseFloat(m.price_adjustment),
+      })),
+    }));
+
+    const { data: kdsItems } = await supabase.from('kds_items').select('*').eq('order_id', orderId);
+    const formattedKds = (kdsItems || []).map(k => ({ ...k, modifiers: k.modifiers_json }));
+
+    await logAudit(req.user?.id, req.user?.name, 'order_created', 'order', orderId,
+      { orderNumber, total, items: items.length, paymentMethod });
+
+    // Broadcast via Supabase channel
+    await supabase.channel('pos-events').send({
+      type: 'broadcast',
+      event: 'order:created',
+      payload: { id: orderId, orderNumber },
+    });
+
+    res.json({ ...order, items: formattedItems, kdsItems: formattedKds, recipeCost });
   } catch (err) {
     console.error('Order creation error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Cancel order (requires override for processed orders)
+app.patch('/api/orders/:id/cancel', async (req, res) => {
+  try {
+    const { data: order } = await supabase.from('orders').select('*').eq('id', req.params.id).single();
+    if (!order) return res.status(404).json({ error: 'Order not found' });
+
+    await supabase.from('orders').update({ status: 'cancelled' }).eq('id', req.params.id);
+    await logAudit(req.user?.id, req.user?.name, 'order_cancelled', 'order', req.params.id, {
+      orderNumber: order.order_number,
+      total: order.total,
+      authorizedBy: req.body.authorizedBy || null,
+    });
+    res.json({ ok: true });
+  } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
@@ -274,127 +448,163 @@ app.post('/api/orders', (req, res) => {
 // KDS
 // ═══════════════════════════════════════════════════════════════════════════
 
-app.get('/api/kds/:station', (req, res) => {
-  const db = getDb();
-  const { station } = req.params;
-  const items = db.prepare(`
-    SELECT * FROM kds_items
-    WHERE station = ? AND status != 'delivered'
-    ORDER BY routed_at ASC
-  `).all(station).map(k => ({ ...k, modifiers: JSON.parse(k.modifiers_json) }));
-  res.json(items);
+app.get('/api/kds/:station', async (req, res) => {
+  try {
+    const { station } = req.params;
+    const { data } = await supabase
+      .from('kds_items')
+      .select('*')
+      .eq('station', station)
+      .neq('status', 'delivered')
+      .order('routed_at');
+
+    res.json((data || []).map(k => ({ ...k, modifiers: k.modifiers_json })));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-// KDS history — delivered items for current shift (today)
-app.get('/api/kds/:station/history', (req, res) => {
-  const db = getDb();
-  const { station } = req.params;
-  const date = req.query.date || new Date().toISOString().slice(0, 10);
-  const items = db.prepare(`
-    SELECT * FROM kds_items
-    WHERE station = ? AND status = 'delivered' AND date(delivered_at) = ?
-    ORDER BY delivered_at DESC
-    LIMIT 50
-  `).all(station, date).map(k => ({ ...k, modifiers: JSON.parse(k.modifiers_json) }));
-  res.json(items);
+app.get('/api/kds/:station/history', async (req, res) => {
+  try {
+    const { station } = req.params;
+    const date = req.query.date || new Date().toISOString().slice(0, 10);
+    const dayStart = `${date}T00:00:00`;
+    const dayEnd = `${date}T23:59:59`;
+
+    const { data } = await supabase
+      .from('kds_items')
+      .select('*')
+      .eq('station', station)
+      .eq('status', 'delivered')
+      .gte('delivered_at', dayStart)
+      .lte('delivered_at', dayEnd)
+      .order('delivered_at', { ascending: false })
+      .limit(50);
+
+    res.json((data || []).map(k => ({ ...k, modifiers: k.modifiers_json })));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-app.patch('/api/kds/:itemId', (req, res) => {
-  const db = getDb();
-  const { itemId } = req.params;
-  const { status } = req.body;
+app.patch('/api/kds/:itemId', async (req, res) => {
+  try {
+    const { itemId } = req.params;
+    const { status } = req.body;
 
-  // Allow 'pending' for undo operations
-  if (!['pending', 'in_progress', 'ready', 'delivered'].includes(status)) {
-    return res.status(400).json({ error: 'Invalid status' });
-  }
-
-  // Handle time fields — clear them when reverting
-  if (status === 'pending') {
-    db.prepare(`UPDATE kds_items SET status = 'pending', ready_at = NULL, delivered_at = NULL WHERE id = ?`).run(itemId);
-  } else if (status === 'ready') {
-    db.prepare(`UPDATE kds_items SET status = 'ready', ready_at = datetime('now','localtime'), delivered_at = NULL WHERE id = ?`).run(itemId);
-  } else if (status === 'delivered') {
-    db.prepare(`UPDATE kds_items SET status = 'delivered', delivered_at = datetime('now','localtime') WHERE id = ?`).run(itemId);
-  } else {
-    db.prepare(`UPDATE kds_items SET status = ? WHERE id = ?`).run(status, itemId);
-  }
-
-  const item = db.prepare(`SELECT * FROM kds_items WHERE id = ?`).get(itemId);
-  if (item) {
-    const updated = { ...item, modifiers: JSON.parse(item.modifiers_json) };
-    io.to(`kds:${item.station}`).emit('kds:item-updated', updated);
-
-    // Also broadcast globally so in-app KDS picks it up
-    io.emit('kds:item-updated-global', updated);
-
-    const pendingRow = db.prepare(`
-      SELECT COUNT(*) as pending FROM kds_items WHERE order_id = ? AND status != 'delivered'
-    `).get(item.order_id);
-    if (pendingRow && pendingRow.pending === 0) {
-      io.emit('kds:order-complete', { orderId: item.order_id, orderNumber: item.order_number });
+    if (!['pending', 'in_progress', 'ready', 'delivered'].includes(status)) {
+      return res.status(400).json({ error: 'Invalid status' });
     }
-  }
 
-  res.json({ ok: true, item: item ? { ...item, modifiers: JSON.parse(item.modifiers_json) } : null });
+    const updateObj = { status };
+    if (status === 'pending') {
+      updateObj.ready_at = null;
+      updateObj.delivered_at = null;
+    } else if (status === 'ready') {
+      updateObj.ready_at = new Date().toISOString();
+      updateObj.delivered_at = null;
+    } else if (status === 'delivered') {
+      updateObj.delivered_at = new Date().toISOString();
+    }
+
+    await supabase.from('kds_items').update(updateObj).eq('id', itemId);
+
+    const { data: item } = await supabase.from('kds_items').select('*').eq('id', itemId).single();
+    if (item) {
+      const updated = { ...item, modifiers: item.modifiers_json };
+
+      // Check if all items for this order are delivered
+      const { data: pendingItems } = await supabase
+        .from('kds_items')
+        .select('id')
+        .eq('order_id', item.order_id)
+        .neq('status', 'delivered');
+
+      if (!pendingItems || pendingItems.length === 0) {
+        await supabase.channel('pos-events').send({
+          type: 'broadcast',
+          event: 'kds:order-complete',
+          payload: { orderId: item.order_id, orderNumber: item.order_number },
+        });
+      }
+
+      res.json({ ok: true, item: updated });
+    } else {
+      res.json({ ok: true, item: null });
+    }
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
 // WASTE
 // ═══════════════════════════════════════════════════════════════════════════
 
-app.get('/api/waste', (req, res) => {
-  const db = getDb();
-  const date = req.query.date || new Date().toISOString().slice(0, 10);
-  const logs = db.prepare(`SELECT * FROM waste_logs WHERE date(created_at) = ? ORDER BY created_at DESC`).all(date);
-  res.json(logs);
+app.get('/api/waste', async (req, res) => {
+  try {
+    const date = req.query.date || new Date().toISOString().slice(0, 10);
+    const dayStart = `${date}T00:00:00`;
+    const dayEnd = `${date}T23:59:59`;
+
+    const { data } = await supabase
+      .from('waste_logs')
+      .select('*')
+      .gte('created_at', dayStart)
+      .lte('created_at', dayEnd)
+      .order('created_at', { ascending: false });
+
+    res.json(data || []);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-app.post('/api/waste', (req, res) => {
-  const db = getDb();
+app.post('/api/waste', async (req, res) => {
   const { itemType, itemId, quantity, reason, notes } = req.body;
   if (!itemId || !quantity || !reason) return res.status(400).json({ error: 'Missing fields' });
 
   try {
-    const result = db.transaction(() => {
-      const wasteId = uuid();
-      let totalCost = 0;
-      let itemName = '';
-      let unit = 'pz';
+    const wasteId = uuid();
+    let totalCost = 0;
+    let itemName = '';
+    let unit = 'pz';
 
-      if (itemType === 'supply') {
-        const inv = db.prepare(`SELECT * FROM inventory_items WHERE id = ?`).get(itemId);
-        if (!inv) throw new Error('Inventory item not found');
-        itemName = inv.name;
-        unit = inv.unit;
-        const { totalCost: cost } = deductFifo(itemId, quantity, 'waste', wasteId);
-        totalCost = cost;
-      } else if (itemType === 'product') {
-        const prod = db.prepare(`SELECT * FROM products WHERE id = ?`).get(itemId);
-        if (!prod) throw new Error('Product not found');
-        itemName = prod.name;
-        const materials = resolveRecipe(itemId, []);
-        for (const [invItemId, qty] of materials) {
-          const totalQty = qty * quantity;
-          const { totalCost: cost } = deductFifo(invItemId, totalQty, 'waste', wasteId);
-          totalCost += cost;
-        }
+    if (itemType === 'supply') {
+      const { data: inv } = await supabase.from('inventory_items').select('*').eq('id', itemId).single();
+      if (!inv) throw new Error('Inventory item not found');
+      itemName = inv.name;
+      unit = inv.unit;
+      const result = await deductFifo(itemId, quantity, 'waste', wasteId);
+      totalCost = result.totalCost || 0;
+    } else if (itemType === 'product') {
+      const { data: prod } = await supabase.from('products').select('*').eq('id', itemId).single();
+      if (!prod) throw new Error('Product not found');
+      itemName = prod.name;
+      const materials = await resolveRecipe(itemId, []);
+      for (const [invItemId, qty] of materials) {
+        const totalQty = qty * quantity;
+        const result = await deductFifo(invItemId, totalQty, 'waste', wasteId);
+        totalCost += (result.totalCost || 0);
       }
+    }
 
-      db.prepare(`
-        INSERT INTO waste_logs (id, item_type, item_id, item_name, quantity, unit, reason, notes, total_cost, user_id, user_name, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now','localtime'))
-      `).run(wasteId, itemType, itemId, itemName, quantity, unit, reason, notes || '', totalCost,
-        req.user?.id || null, req.user?.name || null);
+    await supabase.from('waste_logs').insert({
+      id: wasteId, item_type: itemType, item_id: itemId, item_name: itemName,
+      quantity, unit, reason, notes: notes || '', total_cost: totalCost,
+      user_id: req.user?.id || null, user_name: req.user?.name || null,
+    });
 
-      logAudit(req.user?.id, req.user?.name, 'waste_registered', 'waste', wasteId,
-        { itemType, itemName, quantity, reason, totalCost });
+    await logAudit(req.user?.id, req.user?.name, 'waste_registered', 'waste', wasteId,
+      { itemType, itemName, quantity, reason, totalCost });
 
-      return db.prepare(`SELECT * FROM waste_logs WHERE id = ?`).get(wasteId);
-    })();
+    const { data: wasteLog } = await supabase.from('waste_logs').select('*').eq('id', wasteId).single();
 
-    io.emit('waste:created', result);
-    res.json(result);
+    await supabase.channel('pos-events').send({
+      type: 'broadcast', event: 'waste:created', payload: wasteLog,
+    });
+
+    res.json(wasteLog);
   } catch (err) {
     console.error('Waste error:', err);
     res.status(500).json({ error: err.message });
@@ -405,512 +615,578 @@ app.post('/api/waste', (req, res) => {
 // ANALYTICS
 // ═══════════════════════════════════════════════════════════════════════════
 
-app.get('/api/analytics', (req, res) => {
-  const db = getDb();
-  const date = req.query.date || new Date().toISOString().slice(0, 10);
+app.get('/api/analytics', async (req, res) => {
+  try {
+    const date = req.query.date || new Date().toISOString().slice(0, 10);
+    const dayStart = `${date}T00:00:00`;
+    const dayEnd = `${date}T23:59:59`;
 
-  const revRow = db.prepare(`
-    SELECT COALESCE(SUM(total), 0) as revenue, COUNT(*) as orderCount
-    FROM orders WHERE date(created_at) = ?
-  `).get(date);
+    // Revenue
+    const { data: ordersToday } = await supabase
+      .from('orders')
+      .select('total, created_at')
+      .gte('created_at', dayStart)
+      .lte('created_at', dayEnd);
 
-  const revenue = revRow?.revenue || 0;
-  const orderCount = revRow?.orderCount || 0;
-  const avgTicket = orderCount > 0 ? revenue / orderCount : 0;
+    const revenue = (ordersToday || []).reduce((s, o) => s + parseFloat(o.total), 0);
+    const orderCount = (ordersToday || []).length;
+    const avgTicket = orderCount > 0 ? revenue / orderCount : 0;
 
-  const wasteRow = db.prepare(`
-    SELECT COALESCE(SUM(total_cost), 0) as wasteCost FROM waste_logs WHERE date(created_at) = ?
-  `).get(date);
-  const wasteCost = wasteRow?.wasteCost || 0;
+    // Waste cost
+    const { data: wasteToday } = await supabase
+      .from('waste_logs')
+      .select('total_cost')
+      .gte('created_at', dayStart)
+      .lte('created_at', dayEnd);
+    const wasteCost = (wasteToday || []).reduce((s, w) => s + parseFloat(w.total_cost), 0);
 
-  const recipeRow = db.prepare(`
-    SELECT COALESCE(SUM(ABS(im.cost)), 0) as recipeCost
-    FROM inventory_movements im
-    WHERE im.movement_type = 'sale' AND date(im.created_at) = ?
-  `).get(date);
-  const recipeCost = recipeRow?.recipeCost || 0;
+    // Recipe cost (from inventory movements)
+    const { data: movements } = await supabase
+      .from('inventory_movements')
+      .select('cost')
+      .eq('movement_type', 'sale')
+      .gte('created_at', dayStart)
+      .lte('created_at', dayEnd);
+    const recipeCost = (movements || []).reduce((s, m) => s + Math.abs(parseFloat(m.cost)), 0);
 
-  const topSellers = db.prepare(`
-    SELECT oi.product_name, oi.product_id,
-      SUM(oi.quantity) as totalQty,
-      SUM(oi.line_total) as totalRevenue
-    FROM order_items oi
-    JOIN orders o ON o.id = oi.order_id
-    WHERE date(o.created_at) = ?
-    GROUP BY oi.product_id
-    ORDER BY totalQty DESC
-    LIMIT 10
-  `).all(date);
+    // Top sellers
+    const { data: orderItemsToday } = await supabase
+      .from('order_items')
+      .select('product_name, product_id, quantity, line_total, order_id');
 
-  const products = db.prepare(`SELECT id, name, price FROM products WHERE deleted_at IS NULL`).all();
-  const profitability = products.map(p => {
-    const recipe = db.prepare(`SELECT inventory_item_id, quantity FROM recipes WHERE product_id = ?`).all(p.id);
-    let recipeCostPer = 0;
-    for (const r of recipe) {
-      const batch = db.prepare(`SELECT cost_per_unit FROM inventory_batches WHERE inventory_item_id = ? AND quantity_remaining > 0 ORDER BY received_at ASC LIMIT 1`).get(r.inventory_item_id);
-      if (batch) recipeCostPer += r.quantity * batch.cost_per_unit;
+    // Filter to today's orders
+    const todayOrderIds = (ordersToday || []).map(o => o.id);
+    // We need order IDs — let's get them
+    const { data: todayOrders } = await supabase
+      .from('orders')
+      .select('id')
+      .gte('created_at', dayStart)
+      .lte('created_at', dayEnd);
+    const todayIds = new Set((todayOrders || []).map(o => o.id));
+
+    const filteredItems = (orderItemsToday || []).filter(oi => todayIds.has(oi.order_id));
+    const sellerMap = {};
+    for (const oi of filteredItems) {
+      if (!sellerMap[oi.product_id]) sellerMap[oi.product_id] = { product_name: oi.product_name, product_id: oi.product_id, totalQty: 0, totalRevenue: 0 };
+      sellerMap[oi.product_id].totalQty += oi.quantity;
+      sellerMap[oi.product_id].totalRevenue += parseFloat(oi.line_total);
     }
-    const margin = p.price > 0 ? ((p.price - recipeCostPer) / p.price * 100) : 0;
-    return { id: p.id, name: p.name, price: p.price, recipeCost: recipeCostPer, margin: Math.round(margin * 10) / 10 };
-  }).sort((a, b) => b.margin - a.margin);
+    const topSellers = Object.values(sellerMap).sort((a, b) => b.totalQty - a.totalQty).slice(0, 10);
 
-  // Sales by hour (heatmap data)
-  const salesByHour = db.prepare(`
-    SELECT CAST(strftime('%H', created_at) AS INTEGER) as hour,
-      COALESCE(SUM(total), 0) as revenue, COUNT(*) as orders
-    FROM orders WHERE date(created_at) = ?
-    GROUP BY hour ORDER BY hour
-  `).all(date);
+    // Profitability
+    const { data: allProducts } = await supabase.from('products').select('id, name, price').is('deleted_at', null);
+    const { data: allRecipes } = await supabase.from('recipes').select('*');
+    const { data: allBatches } = await supabase.from('inventory_batches').select('inventory_item_id, cost_per_unit, quantity_remaining, received_at').gt('quantity_remaining', 0).order('received_at');
 
-  // Fill all 24 hours
-  const hourlyData = Array.from({ length: 24 }, (_, h) => {
-    const found = salesByHour.find(s => s.hour === h);
-    return { hour: h, revenue: found?.revenue || 0, orders: found?.orders || 0 };
-  });
+    const profitability = (allProducts || []).map(p => {
+      const recipe = (allRecipes || []).filter(r => r.product_id === p.id);
+      let recipeCostPer = 0;
+      for (const r of recipe) {
+        const batch = (allBatches || []).find(b => b.inventory_item_id === r.inventory_item_id);
+        if (batch) recipeCostPer += r.quantity * parseFloat(batch.cost_per_unit);
+      }
+      const price = parseFloat(p.price);
+      const margin = price > 0 ? ((price - recipeCostPer) / price * 100) : 0;
+      return { id: p.id, name: p.name, price, recipeCost: recipeCostPer, margin: Math.round(margin * 10) / 10 };
+    }).sort((a, b) => b.margin - a.margin);
 
-  // Waste percentage = wasteCost / revenue * 100
-  const wastePercent = revenue > 0 ? (wasteCost / revenue * 100) : 0;
+    // Sales by hour
+    const hourlyData = Array.from({ length: 24 }, (_, h) => ({ hour: h, revenue: 0, orders: 0 }));
+    for (const o of (ordersToday || [])) {
+      const hour = new Date(o.created_at).getHours();
+      hourlyData[hour].revenue += parseFloat(o.total);
+      hourlyData[hour].orders += 1;
+    }
 
-  // Top 5 most profitable by margin
-  const top5Profitable = profitability.filter(p => p.recipeCost > 0).slice(0, 5);
+    const wastePercent = revenue > 0 ? (wasteCost / revenue * 100) : 0;
+    const top5Profitable = profitability.filter(p => p.recipeCost > 0).slice(0, 5);
 
-  res.json({ revenue, orderCount, avgTicket, wasteCost, recipeCost, topSellers, profitability, hourlyData, wastePercent: Math.round(wastePercent * 10) / 10, top5Profitable });
+    res.json({ revenue, orderCount, avgTicket, wasteCost, recipeCost, topSellers, profitability, hourlyData, wastePercent: Math.round(wastePercent * 10) / 10, top5Profitable });
+  } catch (err) {
+    console.error('Analytics error:', err);
+    res.status(500).json({ error: err.message });
+  }
 });
 
-// Analytics: detailed orders with cajero, prep time, and gross margin
-app.get('/api/analytics/orders', requireRole('admin', 'manager'), (req, res) => {
-  const db = getDb();
-  const date = req.query.date || new Date().toISOString().slice(0, 10);
+app.get('/api/analytics/orders', requireRole('admin', 'supervisor'), async (req, res) => {
+  try {
+    const date = req.query.date || new Date().toISOString().slice(0, 10);
+    const dayStart = `${date}T00:00:00`;
+    const dayEnd = `${date}T23:59:59`;
 
-  const orders = db.prepare(`SELECT * FROM orders WHERE date(created_at) = ? ORDER BY created_at DESC`).all(date);
+    const { data: orders } = await supabase
+      .from('orders')
+      .select('*')
+      .gte('created_at', dayStart)
+      .lte('created_at', dayEnd)
+      .order('created_at', { ascending: false });
 
-  const result = orders.map(order => {
-    const items = db.prepare(`SELECT * FROM order_items WHERE order_id = ?`).all(order.id).map(item => ({
-      ...item,
-      modifiers: db.prepare(`SELECT * FROM order_item_modifiers WHERE order_item_id = ?`).all(item.id).map(m => ({
-        id: m.modifier_id, name: m.modifier_name, shortName: m.short_name, priceAdjustment: m.price_adjustment,
-      })),
-    }));
+    if (!orders || orders.length === 0) return res.json([]);
 
-    // Recipe cost for this order (from inventory movements)
-    const costRow = db.prepare(`
-      SELECT COALESCE(SUM(ABS(im.cost)), 0) as totalCost
-      FROM inventory_movements im
-      WHERE im.reference_id = ? AND im.movement_type = 'sale'
-    `).get(order.id);
-    const recipeCost = costRow?.totalCost || 0;
+    const orderIds = orders.map(o => o.id);
+    const { data: allItems } = await supabase.from('order_items').select('*').in('order_id', orderIds);
+    const itemIds = (allItems || []).map(i => i.id);
+    const { data: allMods } = itemIds.length > 0
+      ? await supabase.from('order_item_modifiers').select('*').in('order_item_id', itemIds)
+      : { data: [] };
 
-    // Prep time: time from order creation to last KDS delivery
-    const kdsRow = db.prepare(`
-      SELECT MAX(delivered_at) as lastDelivered, MIN(routed_at) as firstRouted
-      FROM kds_items WHERE order_id = ? AND status = 'delivered'
-    `).get(order.id);
+    const { data: allMovements } = await supabase.from('inventory_movements').select('reference_id, cost').eq('movement_type', 'sale').in('reference_id', orderIds);
+    const { data: allKds } = await supabase.from('kds_items').select('order_id, routed_at, delivered_at, status').in('order_id', orderIds);
 
-    let prepTimeMinutes = null;
-    if (kdsRow?.lastDelivered && kdsRow?.firstRouted) {
-      const start = new Date(kdsRow.firstRouted).getTime();
-      const end = new Date(kdsRow.lastDelivered).getTime();
-      prepTimeMinutes = Math.round((end - start) / 60000);
-    }
+    const result = orders.map(order => {
+      const items = (allItems || []).filter(i => i.order_id === order.id).map(item => ({
+        ...item,
+        modifiers: (allMods || []).filter(m => m.order_item_id === item.id).map(m => ({
+          id: m.modifier_id, name: m.modifier_name, shortName: m.short_name, priceAdjustment: parseFloat(m.price_adjustment),
+        })),
+      }));
 
-    const grossMargin = order.total > 0 ? ((order.total - recipeCost) / order.total * 100) : 0;
+      const orderMovements = (allMovements || []).filter(m => m.reference_id === order.id);
+      const rcost = orderMovements.reduce((s, m) => s + Math.abs(parseFloat(m.cost)), 0);
 
-    return {
-      id: order.id,
-      order_number: order.order_number,
-      customer_name: order.customer_name,
-      order_type: order.order_type,
-      payment_method: order.payment_method,
-      total: order.total,
-      user_name: order.user_name || 'Sistema',
-      created_at: order.created_at,
-      items,
-      recipeCost,
-      prepTimeMinutes,
-      grossMargin: Math.round(grossMargin * 10) / 10,
-    };
-  });
+      const orderKds = (allKds || []).filter(k => k.order_id === order.id && k.status === 'delivered');
+      let prepTimeMinutes = null;
+      if (orderKds.length > 0) {
+        const starts = orderKds.map(k => new Date(k.routed_at).getTime());
+        const ends = orderKds.map(k => new Date(k.delivered_at).getTime());
+        prepTimeMinutes = Math.round((Math.max(...ends) - Math.min(...starts)) / 60000);
+      }
 
-  res.json(result);
+      const total = parseFloat(order.total);
+      const grossMargin = total > 0 ? ((total - rcost) / total * 100) : 0;
+
+      return {
+        id: order.id, order_number: order.order_number, customer_name: order.customer_name,
+        order_type: order.order_type, payment_method: order.payment_method, total,
+        user_name: order.user_name || 'Sistema', created_at: order.created_at,
+        items, recipeCost: rcost, prepTimeMinutes, grossMargin: Math.round(grossMargin * 10) / 10,
+      };
+    });
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
 // AUDIT LOG
 // ═══════════════════════════════════════════════════════════════════════════
 
-app.get('/api/audit', requireRole('admin', 'manager'), (req, res) => {
-  const db = getDb();
-  const limit = parseInt(req.query.limit) || 100;
-  const offset = parseInt(req.query.offset) || 0;
-  const { action, userId, entityType, role, date } = req.query;
+app.get('/api/audit', requireRole('admin', 'supervisor'), async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 100;
+    const offset = parseInt(req.query.offset) || 0;
+    const { action, userId, entityType, role, date, from, to } = req.query;
 
-  let where = '1=1';
-  const params = [];
+    let query = supabase.from('audit_log').select('*', { count: 'exact' });
 
-  if (action) { where += ` AND al.action = ?`; params.push(action); }
-  if (userId) { where += ` AND al.user_id = ?`; params.push(userId); }
-  if (entityType) { where += ` AND al.entity_type = ?`; params.push(entityType); }
-  if (date) { where += ` AND date(al.created_at) = ?`; params.push(date); }
-  if (role) {
-    where += ` AND al.user_id IN (SELECT id FROM users WHERE role = ?)`;
-    params.push(role);
+    if (action) query = query.eq('action', action);
+    if (userId) query = query.eq('user_id', userId);
+    if (entityType) query = query.eq('entity_type', entityType);
+    if (date) {
+      query = query.gte('created_at', `${date}T00:00:00`).lte('created_at', `${date}T23:59:59`);
+    }
+    if (from) query = query.gte('created_at', from);
+    if (to) query = query.lte('created_at', to);
+
+    query = query.order('created_at', { ascending: false }).range(offset, offset + limit - 1);
+
+    const { data: logs, count, error } = await query;
+    if (error) throw error;
+
+    // Filter by role if needed (join with users)
+    let filteredLogs = logs || [];
+    if (role) {
+      const { data: roleUsers } = await supabase.from('users').select('id').eq('role', role);
+      const roleUserIds = new Set((roleUsers || []).map(u => u.id));
+      filteredLogs = filteredLogs.filter(l => roleUserIds.has(l.user_id));
+    }
+
+    res.json({ logs: filteredLogs, total: count || 0 });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
-
-  const logs = db.prepare(`SELECT al.* FROM audit_log al WHERE ${where} ORDER BY al.created_at DESC LIMIT ? OFFSET ?`).all(...params, limit, offset);
-  const totalRow = db.prepare(`SELECT COUNT(*) as c FROM audit_log al WHERE ${where}`).get(...params);
-  res.json({ logs, total: totalRow?.c || 0 });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
 // ADMIN: CATEGORIES CRUD
 // ═══════════════════════════════════════════════════════════════════════════
 
-app.post('/api/admin/categories', requireRole('admin'), (req, res) => {
-  const db = getDb();
-  const { name, color, kdsStation, sortOrder } = req.body;
-  if (!name || !color) return res.status(400).json({ error: 'Name and color required' });
-  const id = `cat-${uuid().slice(0, 8)}`;
-  db.prepare(`INSERT INTO categories (id, name, color, icon, kds_station, sort_order) VALUES (?,?,?,'',?,?)`)
-    .run(id, name, color, kdsStation || 'bar', sortOrder || 0);
-  logAudit(req.user.id, req.user.name, 'category_created', 'category', id, { name, color });
-  const cat = db.prepare(`SELECT * FROM categories WHERE id = ?`).get(id);
-  io.emit('menu:updated');
-  res.json(cat);
+app.post('/api/admin/categories', requireRole('admin'), async (req, res) => {
+  try {
+    const { name, color, kdsStation, sortOrder } = req.body;
+    if (!name || !color) return res.status(400).json({ error: 'Name and color required' });
+    const id = `cat-${uuid().slice(0, 8)}`;
+    const { error } = await supabase.from('categories').insert({
+      id, name, color, icon: '', kds_station: kdsStation || 'bar', sort_order: sortOrder || 0,
+    });
+    if (error) throw error;
+    await logAudit(req.user.id, req.user.name, 'category_created', 'category', id, { name, color });
+    const { data: cat } = await supabase.from('categories').select('*').eq('id', id).single();
+    await supabase.channel('pos-events').send({ type: 'broadcast', event: 'menu:updated', payload: {} });
+    res.json(cat);
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.put('/api/admin/categories/:id', requireRole('admin'), (req, res) => {
-  const db = getDb();
-  const { name, color, kdsStation, sortOrder } = req.body;
-  db.prepare(`UPDATE categories SET name=COALESCE(?,name), color=COALESCE(?,color), kds_station=COALESCE(?,kds_station), sort_order=COALESCE(?,sort_order) WHERE id=?`)
-    .run(name || null, color || null, kdsStation || null, sortOrder ?? null, req.params.id);
-  logAudit(req.user.id, req.user.name, 'category_updated', 'category', req.params.id, req.body);
-  const cat = db.prepare(`SELECT * FROM categories WHERE id = ?`).get(req.params.id);
-  io.emit('menu:updated');
-  res.json(cat);
+app.put('/api/admin/categories/:id', requireRole('admin'), async (req, res) => {
+  try {
+    const { name, color, kdsStation, sortOrder } = req.body;
+    const update = {};
+    if (name) update.name = name;
+    if (color) update.color = color;
+    if (kdsStation) update.kds_station = kdsStation;
+    if (sortOrder !== undefined) update.sort_order = sortOrder;
+    await supabase.from('categories').update(update).eq('id', req.params.id);
+    await logAudit(req.user.id, req.user.name, 'category_updated', 'category', req.params.id, req.body);
+    const { data: cat } = await supabase.from('categories').select('*').eq('id', req.params.id).single();
+    await supabase.channel('pos-events').send({ type: 'broadcast', event: 'menu:updated', payload: {} });
+    res.json(cat);
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.delete('/api/admin/categories/:id', requireRole('admin'), (req, res) => {
-  const db = getDb();
-  db.prepare(`UPDATE categories SET deleted_at = datetime('now','localtime') WHERE id = ?`).run(req.params.id);
-  logAudit(req.user.id, req.user.name, 'category_deleted', 'category', req.params.id, null);
-  io.emit('menu:updated');
-  res.json({ ok: true });
+app.delete('/api/admin/categories/:id', requireRole('admin'), async (req, res) => {
+  try {
+    await supabase.from('categories').update({ deleted_at: new Date().toISOString() }).eq('id', req.params.id);
+    await logAudit(req.user.id, req.user.name, 'category_deleted', 'category', req.params.id, null);
+    await supabase.channel('pos-events').send({ type: 'broadcast', event: 'menu:updated', payload: {} });
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
 // ADMIN: PRODUCTS CRUD
 // ═══════════════════════════════════════════════════════════════════════════
 
-app.post('/api/admin/products', requireRole('admin'), (req, res) => {
-  const db = getDb();
-  const { name, shortName, price, categoryId, modifierGroupIds } = req.body;
-  if (!name || price == null || !categoryId) return res.status(400).json({ error: 'name, price, categoryId required' });
-  const id = `prod-${uuid().slice(0, 8)}`;
-  db.prepare(`INSERT INTO products (id, category_id, name, short_name, price, modifier_group_ids) VALUES (?,?,?,?,?,?)`)
-    .run(id, categoryId, name, shortName || name.slice(0, 6).toUpperCase(), price, JSON.stringify(modifierGroupIds || []));
-  logAudit(req.user.id, req.user.name, 'product_created', 'product', id, { name, price, categoryId });
-  const prod = db.prepare(`SELECT * FROM products WHERE id = ?`).get(id);
-  io.emit('menu:updated');
-  res.json({ ...prod, modifierGroupIds: JSON.parse(prod.modifier_group_ids), recipe: [] });
+app.post('/api/admin/products', requireRole('admin'), async (req, res) => {
+  try {
+    const { name, shortName, price, categoryId, modifierGroupIds } = req.body;
+    if (!name || price == null || !categoryId) return res.status(400).json({ error: 'name, price, categoryId required' });
+    const id = `prod-${uuid().slice(0, 8)}`;
+    await supabase.from('products').insert({
+      id, category_id: categoryId, name, short_name: shortName || name.slice(0, 6).toUpperCase(),
+      price, modifier_group_ids: modifierGroupIds || [],
+    });
+    await logAudit(req.user.id, req.user.name, 'product_created', 'product', id, { name, price, categoryId });
+    const { data: prod } = await supabase.from('products').select('*').eq('id', id).single();
+    await supabase.channel('pos-events').send({ type: 'broadcast', event: 'menu:updated', payload: {} });
+    res.json({ ...prod, modifierGroupIds: prod.modifier_group_ids, recipe: [] });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.put('/api/admin/products/:id', requireRole('admin'), (req, res) => {
-  const db = getDb();
-  const { name, shortName, price, categoryId, modifierGroupIds } = req.body;
-  const old = db.prepare(`SELECT * FROM products WHERE id = ?`).get(req.params.id);
-  db.prepare(`UPDATE products SET name=COALESCE(?,name), short_name=COALESCE(?,short_name), price=COALESCE(?,price), category_id=COALESCE(?,category_id), modifier_group_ids=COALESCE(?,modifier_group_ids) WHERE id=?`)
-    .run(name || null, shortName || null, price ?? null, categoryId || null,
-      modifierGroupIds ? JSON.stringify(modifierGroupIds) : null, req.params.id);
-  logAudit(req.user.id, req.user.name, 'product_updated', 'product', req.params.id,
-    { before: { name: old?.name, price: old?.price }, after: { name, price } });
-  const prod = db.prepare(`SELECT * FROM products WHERE id = ?`).get(req.params.id);
-  const recipe = db.prepare(`SELECT inventory_item_id, quantity FROM recipes WHERE product_id = ?`).all(req.params.id);
-  io.emit('menu:updated');
-  res.json({ ...prod, modifierGroupIds: JSON.parse(prod.modifier_group_ids), recipe });
+app.put('/api/admin/products/:id', requireRole('admin'), async (req, res) => {
+  try {
+    const { name, shortName, price, categoryId, modifierGroupIds } = req.body;
+    const update = {};
+    if (name) update.name = name;
+    if (shortName) update.short_name = shortName;
+    if (price !== undefined) update.price = price;
+    if (categoryId) update.category_id = categoryId;
+    if (modifierGroupIds) update.modifier_group_ids = modifierGroupIds;
+    await supabase.from('products').update(update).eq('id', req.params.id);
+    await logAudit(req.user.id, req.user.name, 'product_updated', 'product', req.params.id, req.body);
+    const { data: prod } = await supabase.from('products').select('*').eq('id', req.params.id).single();
+    const { data: recipe } = await supabase.from('recipes').select('inventory_item_id, quantity').eq('product_id', req.params.id);
+    await supabase.channel('pos-events').send({ type: 'broadcast', event: 'menu:updated', payload: {} });
+    res.json({ ...prod, modifierGroupIds: prod.modifier_group_ids, recipe: recipe || [] });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.delete('/api/admin/products/:id', requireRole('admin'), (req, res) => {
-  const db = getDb();
-  db.prepare(`UPDATE products SET deleted_at = datetime('now','localtime') WHERE id = ?`).run(req.params.id);
-  logAudit(req.user.id, req.user.name, 'product_deleted', 'product', req.params.id, null);
-  io.emit('menu:updated');
-  res.json({ ok: true });
+app.delete('/api/admin/products/:id', requireRole('admin'), async (req, res) => {
+  try {
+    await supabase.from('products').update({ deleted_at: new Date().toISOString() }).eq('id', req.params.id);
+    await logAudit(req.user.id, req.user.name, 'product_deleted', 'product', req.params.id, null);
+    await supabase.channel('pos-events').send({ type: 'broadcast', event: 'menu:updated', payload: {} });
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
-// ADMIN: RECIPES (per product)
+// ADMIN: RECIPES
 // ═══════════════════════════════════════════════════════════════════════════
 
-app.get('/api/admin/products/:id/recipe', requireRole('admin', 'manager'), (req, res) => {
-  const db = getDb();
-  const recipe = db.prepare(`SELECT r.id, r.inventory_item_id, r.quantity, ii.name as item_name, ii.unit
-    FROM recipes r JOIN inventory_items ii ON ii.id = r.inventory_item_id
-    WHERE r.product_id = ?`).all(req.params.id);
-  res.json(recipe);
+app.get('/api/admin/products/:id/recipe', requireRole('admin', 'supervisor'), async (req, res) => {
+  try {
+    const { data } = await supabase
+      .from('recipes')
+      .select('id, inventory_item_id, quantity')
+      .eq('product_id', req.params.id);
+
+    const { data: invItems } = await supabase.from('inventory_items').select('id, name, unit');
+    const invMap = Object.fromEntries((invItems || []).map(i => [i.id, i]));
+
+    const result = (data || []).map(r => ({
+      ...r, item_name: invMap[r.inventory_item_id]?.name || '', unit: invMap[r.inventory_item_id]?.unit || '',
+    }));
+    res.json(result);
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// Recipe cost calculation (live cost card)
-app.get('/api/admin/products/:id/recipe-cost', requireRole('admin', 'manager'), (req, res) => {
-  const db = getDb();
-  const recipe = db.prepare(`
-    SELECT r.inventory_item_id, r.quantity, ii.name as item_name, ii.unit
-    FROM recipes r JOIN inventory_items ii ON ii.id = r.inventory_item_id
-    WHERE r.product_id = ?
-  `).all(req.params.id);
+app.get('/api/admin/products/:id/recipe-cost', requireRole('admin', 'supervisor'), async (req, res) => {
+  try {
+    const { data: recipe } = await supabase
+      .from('recipes')
+      .select('inventory_item_id, quantity')
+      .eq('product_id', req.params.id);
 
-  const costLines = recipe.map(r => {
-    const batch = db.prepare(
-      `SELECT cost_per_unit FROM inventory_batches WHERE inventory_item_id = ? AND quantity_remaining > 0 ORDER BY received_at ASC LIMIT 1`
-    ).get(r.inventory_item_id);
-    const costPerUnit = batch?.cost_per_unit || 0;
-    const lineCost = r.quantity * costPerUnit;
-    return {
-      inventoryItemId: r.inventory_item_id,
-      itemName: r.item_name,
-      unit: r.unit,
-      quantity: r.quantity,
-      costPerUnit,
-      lineCost: Math.round(lineCost * 100) / 100,
-    };
-  });
+    const { data: invItems } = await supabase.from('inventory_items').select('id, name, unit');
+    const invMap = Object.fromEntries((invItems || []).map(i => [i.id, i]));
 
-  const totalCost = costLines.reduce((s, l) => s + l.lineCost, 0);
-  const product = db.prepare(`SELECT price FROM products WHERE id = ?`).get(req.params.id);
-  const price = product?.price || 0;
-  const margin = price > 0 ? ((price - totalCost) / price * 100) : 0;
+    const { data: batches } = await supabase
+      .from('inventory_batches')
+      .select('inventory_item_id, cost_per_unit, quantity_remaining, received_at')
+      .gt('quantity_remaining', 0)
+      .order('received_at');
 
-  res.json({
-    lines: costLines,
-    totalCost: Math.round(totalCost * 100) / 100,
-    price,
-    margin: Math.round(margin * 10) / 10,
-    grossProfit: Math.round((price - totalCost) * 100) / 100,
-  });
+    const costLines = (recipe || []).map(r => {
+      const batch = (batches || []).find(b => b.inventory_item_id === r.inventory_item_id);
+      const costPerUnit = batch ? parseFloat(batch.cost_per_unit) : 0;
+      const lineCost = r.quantity * costPerUnit;
+      return {
+        inventoryItemId: r.inventory_item_id,
+        itemName: invMap[r.inventory_item_id]?.name || '',
+        unit: invMap[r.inventory_item_id]?.unit || '',
+        quantity: r.quantity, costPerUnit,
+        lineCost: Math.round(lineCost * 100) / 100,
+      };
+    });
+
+    const totalCost = costLines.reduce((s, l) => s + l.lineCost, 0);
+    const { data: product } = await supabase.from('products').select('price').eq('id', req.params.id).single();
+    const price = product ? parseFloat(product.price) : 0;
+    const margin = price > 0 ? ((price - totalCost) / price * 100) : 0;
+
+    res.json({
+      lines: costLines,
+      totalCost: Math.round(totalCost * 100) / 100,
+      price, margin: Math.round(margin * 10) / 10,
+      grossProfit: Math.round((price - totalCost) * 100) / 100,
+    });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.put('/api/admin/products/:id/recipe', requireRole('admin'), (req, res) => {
-  const db = getDb();
-  const { recipe } = req.body; // [{inventoryItemId, quantity}]
-  if (!Array.isArray(recipe)) return res.status(400).json({ error: 'recipe array required' });
-
-  db.transaction(() => {
-    db.prepare(`DELETE FROM recipes WHERE product_id = ?`).run(req.params.id);
-    const insert = db.prepare(`INSERT INTO recipes (product_id, inventory_item_id, quantity) VALUES (?,?,?)`);
-    for (const r of recipe) {
-      insert.run(req.params.id, r.inventoryItemId, r.quantity);
+app.put('/api/admin/products/:id/recipe', requireRole('admin'), async (req, res) => {
+  try {
+    const { recipe } = req.body;
+    if (!Array.isArray(recipe)) return res.status(400).json({ error: 'recipe array required' });
+    await supabase.from('recipes').delete().eq('product_id', req.params.id);
+    if (recipe.length > 0) {
+      await supabase.from('recipes').insert(recipe.map(r => ({
+        product_id: req.params.id, inventory_item_id: r.inventoryItemId, quantity: r.quantity,
+      })));
     }
-  })();
-
-  logAudit(req.user.id, req.user.name, 'recipe_updated', 'product', req.params.id, { recipe });
-  io.emit('menu:updated');
-  const updated = db.prepare(`SELECT inventory_item_id, quantity FROM recipes WHERE product_id = ?`).all(req.params.id);
-  res.json(updated);
+    await logAudit(req.user.id, req.user.name, 'recipe_updated', 'product', req.params.id, { recipe });
+    await supabase.channel('pos-events').send({ type: 'broadcast', event: 'menu:updated', payload: {} });
+    const { data: updated } = await supabase.from('recipes').select('inventory_item_id, quantity').eq('product_id', req.params.id);
+    res.json(updated || []);
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
 // ADMIN: MODIFIER GROUPS CRUD
 // ═══════════════════════════════════════════════════════════════════════════
 
-app.post('/api/admin/modifier-groups', requireRole('admin'), (req, res) => {
-  const db = getDb();
-  const { name, selectionType, isRequired, minSelections, maxSelections } = req.body;
-  if (!name) return res.status(400).json({ error: 'name required' });
-  const id = `mg-${uuid().slice(0, 8)}`;
-  db.prepare(`INSERT INTO modifier_groups (id, name, selection_type, is_required, min_selections, max_selections) VALUES (?,?,?,?,?,?)`)
-    .run(id, name, selectionType || 'single', isRequired ? 1 : 0, minSelections || 0, maxSelections || 1);
-  logAudit(req.user.id, req.user.name, 'modifier_group_created', 'modifier_group', id, { name });
-  const g = db.prepare(`SELECT * FROM modifier_groups WHERE id = ?`).get(id);
-  io.emit('menu:updated');
-  res.json({ ...g, isRequired: !!g.is_required, selectionType: g.selection_type, modifiers: [] });
+app.post('/api/admin/modifier-groups', requireRole('admin'), async (req, res) => {
+  try {
+    const { name, selectionType, isRequired, minSelections, maxSelections } = req.body;
+    if (!name) return res.status(400).json({ error: 'name required' });
+    const id = `mg-${uuid().slice(0, 8)}`;
+    await supabase.from('modifier_groups').insert({
+      id, name, selection_type: selectionType || 'single',
+      is_required: !!isRequired, min_selections: minSelections || 0, max_selections: maxSelections || 1,
+    });
+    await logAudit(req.user.id, req.user.name, 'modifier_group_created', 'modifier_group', id, { name });
+    const { data: g } = await supabase.from('modifier_groups').select('*').eq('id', id).single();
+    await supabase.channel('pos-events').send({ type: 'broadcast', event: 'menu:updated', payload: {} });
+    res.json({ ...g, isRequired: !!g.is_required, selectionType: g.selection_type, modifiers: [] });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.put('/api/admin/modifier-groups/:id', requireRole('admin'), (req, res) => {
-  const db = getDb();
-  const { name, selectionType, isRequired, minSelections, maxSelections } = req.body;
-  db.prepare(`UPDATE modifier_groups SET name=COALESCE(?,name), selection_type=COALESCE(?,selection_type), is_required=COALESCE(?,is_required), min_selections=COALESCE(?,min_selections), max_selections=COALESCE(?,max_selections) WHERE id=?`)
-    .run(name || null, selectionType || null, isRequired !== undefined ? (isRequired ? 1 : 0) : null, minSelections ?? null, maxSelections ?? null, req.params.id);
-  logAudit(req.user.id, req.user.name, 'modifier_group_updated', 'modifier_group', req.params.id, req.body);
-  io.emit('menu:updated');
-  res.json({ ok: true });
+app.put('/api/admin/modifier-groups/:id', requireRole('admin'), async (req, res) => {
+  try {
+    const { name, selectionType, isRequired, minSelections, maxSelections } = req.body;
+    const update = {};
+    if (name) update.name = name;
+    if (selectionType) update.selection_type = selectionType;
+    if (isRequired !== undefined) update.is_required = !!isRequired;
+    if (minSelections !== undefined) update.min_selections = minSelections;
+    if (maxSelections !== undefined) update.max_selections = maxSelections;
+    await supabase.from('modifier_groups').update(update).eq('id', req.params.id);
+    await logAudit(req.user.id, req.user.name, 'modifier_group_updated', 'modifier_group', req.params.id, req.body);
+    await supabase.channel('pos-events').send({ type: 'broadcast', event: 'menu:updated', payload: {} });
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.delete('/api/admin/modifier-groups/:id', requireRole('admin'), (req, res) => {
-  const db = getDb();
-  db.prepare(`UPDATE modifier_groups SET deleted_at = datetime('now','localtime') WHERE id = ?`).run(req.params.id);
-  logAudit(req.user.id, req.user.name, 'modifier_group_deleted', 'modifier_group', req.params.id, null);
-  io.emit('menu:updated');
-  res.json({ ok: true });
+app.delete('/api/admin/modifier-groups/:id', requireRole('admin'), async (req, res) => {
+  try {
+    await supabase.from('modifier_groups').update({ deleted_at: new Date().toISOString() }).eq('id', req.params.id);
+    await logAudit(req.user.id, req.user.name, 'modifier_group_deleted', 'modifier_group', req.params.id, null);
+    await supabase.channel('pos-events').send({ type: 'broadcast', event: 'menu:updated', payload: {} });
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
 // ADMIN: MODIFIERS CRUD
 // ═══════════════════════════════════════════════════════════════════════════
 
-app.post('/api/admin/modifiers', requireRole('admin'), (req, res) => {
-  const db = getDb();
-  const { groupId, name, shortName, priceAdjustment, isDefault } = req.body;
-  if (!groupId || !name) return res.status(400).json({ error: 'groupId and name required' });
-  const id = `mod-${uuid().slice(0, 8)}`;
-  db.prepare(`INSERT INTO modifiers (id, group_id, name, short_name, price_adjustment, is_default) VALUES (?,?,?,?,?,?)`)
-    .run(id, groupId, name, shortName || name.slice(0, 5).toUpperCase(), priceAdjustment || 0, isDefault ? 1 : 0);
-  logAudit(req.user.id, req.user.name, 'modifier_created', 'modifier', id, { name, groupId });
-  io.emit('menu:updated');
-  const m = db.prepare(`SELECT * FROM modifiers WHERE id = ?`).get(id);
-  res.json({ ...m, priceAdjustment: m.price_adjustment, shortName: m.short_name, isDefault: !!m.is_default });
+app.post('/api/admin/modifiers', requireRole('admin'), async (req, res) => {
+  try {
+    const { groupId, name, shortName, priceAdjustment, isDefault } = req.body;
+    if (!groupId || !name) return res.status(400).json({ error: 'groupId and name required' });
+    const id = `mod-${uuid().slice(0, 8)}`;
+    await supabase.from('modifiers').insert({
+      id, group_id: groupId, name, short_name: shortName || name.slice(0, 5).toUpperCase(),
+      price_adjustment: priceAdjustment || 0, is_default: !!isDefault,
+    });
+    await logAudit(req.user.id, req.user.name, 'modifier_created', 'modifier', id, { name, groupId });
+    await supabase.channel('pos-events').send({ type: 'broadcast', event: 'menu:updated', payload: {} });
+    const { data: m } = await supabase.from('modifiers').select('*').eq('id', id).single();
+    res.json({ ...m, priceAdjustment: parseFloat(m.price_adjustment), shortName: m.short_name, isDefault: !!m.is_default });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.put('/api/admin/modifiers/:id', requireRole('admin'), (req, res) => {
-  const db = getDb();
-  const { name, shortName, priceAdjustment, isDefault } = req.body;
-  db.prepare(`UPDATE modifiers SET name=COALESCE(?,name), short_name=COALESCE(?,short_name), price_adjustment=COALESCE(?,price_adjustment), is_default=COALESCE(?,is_default) WHERE id=?`)
-    .run(name || null, shortName || null, priceAdjustment ?? null, isDefault !== undefined ? (isDefault ? 1 : 0) : null, req.params.id);
-  logAudit(req.user.id, req.user.name, 'modifier_updated', 'modifier', req.params.id, req.body);
-  io.emit('menu:updated');
-  res.json({ ok: true });
+app.put('/api/admin/modifiers/:id', requireRole('admin'), async (req, res) => {
+  try {
+    const { name, shortName, priceAdjustment, isDefault } = req.body;
+    const update = {};
+    if (name) update.name = name;
+    if (shortName) update.short_name = shortName;
+    if (priceAdjustment !== undefined) update.price_adjustment = priceAdjustment;
+    if (isDefault !== undefined) update.is_default = !!isDefault;
+    await supabase.from('modifiers').update(update).eq('id', req.params.id);
+    await logAudit(req.user.id, req.user.name, 'modifier_updated', 'modifier', req.params.id, req.body);
+    await supabase.channel('pos-events').send({ type: 'broadcast', event: 'menu:updated', payload: {} });
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.delete('/api/admin/modifiers/:id', requireRole('admin'), (req, res) => {
-  const db = getDb();
-  db.prepare(`UPDATE modifiers SET deleted_at = datetime('now','localtime') WHERE id = ?`).run(req.params.id);
-  logAudit(req.user.id, req.user.name, 'modifier_deleted', 'modifier', req.params.id, null);
-  io.emit('menu:updated');
-  res.json({ ok: true });
+app.delete('/api/admin/modifiers/:id', requireRole('admin'), async (req, res) => {
+  try {
+    await supabase.from('modifiers').update({ deleted_at: new Date().toISOString() }).eq('id', req.params.id);
+    await logAudit(req.user.id, req.user.name, 'modifier_deleted', 'modifier', req.params.id, null);
+    await supabase.channel('pos-events').send({ type: 'broadcast', event: 'menu:updated', payload: {} });
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
 // ADMIN: INVENTORY ITEMS CRUD
 // ═══════════════════════════════════════════════════════════════════════════
 
-app.post('/api/admin/inventory-items', requireRole('admin', 'manager'), (req, res) => {
-  const db = getDb();
-  const { name, unit, isPerishable, minimumStock } = req.body;
-  if (!name || !unit) return res.status(400).json({ error: 'name and unit required' });
-  const id = `inv-${uuid().slice(0, 8)}`;
-  db.prepare(`INSERT INTO inventory_items (id, name, unit, is_perishable, minimum_stock) VALUES (?,?,?,?,?)`)
-    .run(id, name, unit, isPerishable ? 1 : 0, minimumStock || 0);
-  logAudit(req.user.id, req.user.name, 'inventory_item_created', 'inventory_item', id, { name, unit });
-  res.json({ id, name, unit, is_perishable: isPerishable ? 1 : 0, minimum_stock: minimumStock || 0 });
+app.post('/api/admin/inventory-items', requireRole('admin', 'supervisor'), async (req, res) => {
+  try {
+    const { name, unit, isPerishable, minimumStock } = req.body;
+    if (!name || !unit) return res.status(400).json({ error: 'name and unit required' });
+    const id = `inv-${uuid().slice(0, 8)}`;
+    await supabase.from('inventory_items').insert({
+      id, name, unit, is_perishable: !!isPerishable, minimum_stock: minimumStock || 0,
+    });
+    await logAudit(req.user.id, req.user.name, 'inventory_item_created', 'inventory_item', id, { name, unit });
+    res.json({ id, name, unit, is_perishable: isPerishable, minimum_stock: minimumStock || 0 });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.put('/api/admin/inventory-items/:id', requireRole('admin', 'manager'), (req, res) => {
-  const db = getDb();
-  const { name, unit, isPerishable, minimumStock } = req.body;
-  db.prepare(`UPDATE inventory_items SET name=COALESCE(?,name), unit=COALESCE(?,unit), is_perishable=COALESCE(?,is_perishable), minimum_stock=COALESCE(?,minimum_stock) WHERE id=?`)
-    .run(name || null, unit || null, isPerishable !== undefined ? (isPerishable ? 1 : 0) : null, minimumStock ?? null, req.params.id);
-  logAudit(req.user.id, req.user.name, 'inventory_item_updated', 'inventory_item', req.params.id, req.body);
-  res.json({ ok: true });
+app.put('/api/admin/inventory-items/:id', requireRole('admin', 'supervisor'), async (req, res) => {
+  try {
+    const { name, unit, isPerishable, minimumStock } = req.body;
+    const update = {};
+    if (name) update.name = name;
+    if (unit) update.unit = unit;
+    if (isPerishable !== undefined) update.is_perishable = !!isPerishable;
+    if (minimumStock !== undefined) update.minimum_stock = minimumStock;
+    await supabase.from('inventory_items').update(update).eq('id', req.params.id);
+    await logAudit(req.user.id, req.user.name, 'inventory_item_updated', 'inventory_item', req.params.id, req.body);
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.delete('/api/admin/inventory-items/:id', requireRole('admin'), (req, res) => {
-  const db = getDb();
-  db.prepare(`UPDATE inventory_items SET deleted_at = datetime('now','localtime') WHERE id = ?`).run(req.params.id);
-  logAudit(req.user.id, req.user.name, 'inventory_item_deleted', 'inventory_item', req.params.id, null);
-  res.json({ ok: true });
+app.delete('/api/admin/inventory-items/:id', requireRole('admin'), async (req, res) => {
+  try {
+    await supabase.from('inventory_items').update({ deleted_at: new Date().toISOString() }).eq('id', req.params.id);
+    await logAudit(req.user.id, req.user.name, 'inventory_item_deleted', 'inventory_item', req.params.id, null);
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
 // ADMIN: USERS CRUD
 // ═══════════════════════════════════════════════════════════════════════════
 
-app.get('/api/admin/users', requireRole('admin'), (req, res) => {
-  const db = getDb();
-  const users = db.prepare(`SELECT id, name, role, is_active, created_at FROM users ORDER BY name`).all();
-  res.json(users);
+app.get('/api/admin/users', requireRole('admin'), async (req, res) => {
+  try {
+    const { data } = await supabase.from('users').select('id, name, role, operator_type, is_active, created_at').order('name');
+    res.json(data || []);
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.post('/api/admin/users', requireRole('admin'), (req, res) => {
-  const db = getDb();
-  const { name, pin, role } = req.body;
-  if (!name || !pin || !role) return res.status(400).json({ error: 'name, pin, role required' });
-  if (pin.length !== 6) return res.status(400).json({ error: 'PIN must be 6 digits' });
-  const id = `user-${uuid().slice(0, 8)}`;
-  db.prepare(`INSERT INTO users (id, name, pin_hash, role, is_active) VALUES (?,?,?,?,1)`)
-    .run(id, name, hashPin(pin), role);
-  logAudit(req.user.id, req.user.name, 'user_created', 'user', id, { name, role });
-  res.json({ id, name, role, is_active: 1 });
+app.post('/api/admin/users', requireRole('admin'), async (req, res) => {
+  try {
+    const { name, pin, role, operatorType } = req.body;
+    if (!name || !pin || !role) return res.status(400).json({ error: 'name, pin, role required' });
+    if (pin.length !== 6) return res.status(400).json({ error: 'PIN must be 6 digits' });
+    const id = `user-${uuid().slice(0, 8)}`;
+    await supabase.from('users').insert({
+      id, name, pin_hash: hashPin(pin), role,
+      operator_type: role === 'operador' ? (operatorType || 'cajero') : null,
+    });
+    await logAudit(req.user.id, req.user.name, 'user_created', 'user', id, { name, role, operatorType });
+    res.json({ id, name, role, operator_type: role === 'operador' ? (operatorType || 'cajero') : null, is_active: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.put('/api/admin/users/:id', requireRole('admin'), (req, res) => {
-  const db = getDb();
-  const { name, pin, role, isActive } = req.body;
-  if (name) db.prepare(`UPDATE users SET name = ? WHERE id = ?`).run(name, req.params.id);
-  if (role) db.prepare(`UPDATE users SET role = ? WHERE id = ?`).run(role, req.params.id);
-  if (pin) db.prepare(`UPDATE users SET pin_hash = ? WHERE id = ?`).run(hashPin(pin), req.params.id);
-  if (isActive !== undefined) db.prepare(`UPDATE users SET is_active = ? WHERE id = ?`).run(isActive ? 1 : 0, req.params.id);
-  logAudit(req.user.id, req.user.name, 'user_updated', 'user', req.params.id, { name, role, isActive });
-  const user = db.prepare(`SELECT id, name, role, is_active FROM users WHERE id = ?`).get(req.params.id);
-  res.json(user);
+app.put('/api/admin/users/:id', requireRole('admin'), async (req, res) => {
+  try {
+    const { name, pin, role, operatorType, isActive } = req.body;
+    const update = {};
+    if (name) update.name = name;
+    if (role) {
+      update.role = role;
+      update.operator_type = role === 'operador' ? (operatorType || 'cajero') : null;
+    } else if (operatorType !== undefined) {
+      update.operator_type = operatorType;
+    }
+    if (pin) update.pin_hash = hashPin(pin);
+    if (isActive !== undefined) update.is_active = !!isActive;
+    await supabase.from('users').update(update).eq('id', req.params.id);
+    await logAudit(req.user.id, req.user.name, 'user_updated', 'user', req.params.id, { name, role, operatorType, isActive });
+    const { data: user } = await supabase.from('users').select('id, name, role, operator_type, is_active').eq('id', req.params.id).single();
+    res.json(user);
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
 // MODIFIER RECIPE ADJUSTMENTS
 // ═══════════════════════════════════════════════════════════════════════════
 
-app.get('/api/admin/modifier-recipe-adjustments', requireRole('admin'), (req, res) => {
-  const db = getDb();
-  const adjs = db.prepare(`SELECT * FROM modifier_recipe_adjustments`).all();
-  res.json(adjs);
+app.get('/api/admin/modifier-recipe-adjustments', requireRole('admin'), async (req, res) => {
+  try {
+    const { data } = await supabase.from('modifier_recipe_adjustments').select('*');
+    res.json(data || []);
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.put('/api/admin/modifier-recipe-adjustments/:modifierId', requireRole('admin'), (req, res) => {
-  const db = getDb();
-  const { adjustments } = req.body; // [{inventoryItemId, quantity, replacesInventoryItemId}]
-  if (!Array.isArray(adjustments)) return res.status(400).json({ error: 'adjustments array required' });
-
-  db.transaction(() => {
-    db.prepare(`DELETE FROM modifier_recipe_adjustments WHERE modifier_id = ?`).run(req.params.modifierId);
-    const insert = db.prepare(`INSERT INTO modifier_recipe_adjustments (modifier_id, inventory_item_id, quantity, replaces_inventory_item_id) VALUES (?,?,?,?)`);
-    for (const a of adjustments) {
-      insert.run(req.params.modifierId, a.inventoryItemId, a.quantity, a.replacesInventoryItemId || null);
+app.put('/api/admin/modifier-recipe-adjustments/:modifierId', requireRole('admin'), async (req, res) => {
+  try {
+    const { adjustments } = req.body;
+    if (!Array.isArray(adjustments)) return res.status(400).json({ error: 'adjustments array required' });
+    await supabase.from('modifier_recipe_adjustments').delete().eq('modifier_id', req.params.modifierId);
+    if (adjustments.length > 0) {
+      await supabase.from('modifier_recipe_adjustments').insert(adjustments.map(a => ({
+        modifier_id: req.params.modifierId,
+        inventory_item_id: a.inventoryItemId,
+        quantity: a.quantity,
+        replaces_inventory_item_id: a.replacesInventoryItemId || null,
+      })));
     }
-  })();
-
-  logAudit(req.user.id, req.user.name, 'modifier_adjustments_updated', 'modifier', req.params.modifierId, { adjustments });
-  io.emit('menu:updated');
-  res.json({ ok: true });
-});
-
-// ═══════════════════════════════════════════════════════════════════════════
-// WEBSOCKET
-// ═══════════════════════════════════════════════════════════════════════════
-
-io.on('connection', (socket) => {
-  console.log(`Client connected: ${socket.id}`);
-
-  socket.on('kds:join', (station) => {
-    socket.join(`kds:${station}`);
-    console.log(`${socket.id} joined kds:${station}`);
-  });
-
-  socket.on('kds:mark-ready', (itemId) => {
-    const db = getDb();
-    db.prepare(`UPDATE kds_items SET status = 'ready', ready_at = datetime('now','localtime') WHERE id = ?`).run(itemId);
-    const item = db.prepare(`SELECT * FROM kds_items WHERE id = ?`).get(itemId);
-    if (item) {
-      io.to(`kds:${item.station}`).emit('kds:item-updated', { ...item, modifiers: JSON.parse(item.modifiers_json) });
-    }
-  });
-
-  socket.on('kds:mark-delivered', (itemId) => {
-    const db = getDb();
-    db.prepare(`UPDATE kds_items SET status = 'delivered', delivered_at = datetime('now','localtime') WHERE id = ?`).run(itemId);
-    const item = db.prepare(`SELECT * FROM kds_items WHERE id = ?`).get(itemId);
-    if (item) {
-      io.to(`kds:${item.station}`).emit('kds:item-updated', { ...item, modifiers: JSON.parse(item.modifiers_json) });
-      const pendingRow = db.prepare(`SELECT COUNT(*) as pending FROM kds_items WHERE order_id = ? AND status != 'delivered'`).get(item.order_id);
-      if (pendingRow && pendingRow.pending === 0) {
-        io.emit('kds:order-complete', { orderId: item.order_id, orderNumber: item.order_number });
-      }
-    }
-  });
-
-  socket.on('disconnect', () => {
-    console.log(`Client disconnected: ${socket.id}`);
-  });
+    await logAudit(req.user.id, req.user.name, 'modifier_adjustments_updated', 'modifier', req.params.modifierId, { adjustments });
+    await supabase.channel('pos-events').send({ type: 'broadcast', event: 'menu:updated', payload: {} });
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
-// SPA FALLBACK (for React Router — must be after all API routes)
+// SPA FALLBACK
 // ═══════════════════════════════════════════════════════════════════════════
 
 if (fs.existsSync(FRONTEND_DIST)) {
@@ -920,66 +1196,38 @@ if (fs.existsSync(FRONTEND_DIST)) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// START SERVER (async init)
+// START SERVER
 // ═══════════════════════════════════════════════════════════════════════════
 
 async function start() {
-  await initDatabase();
-  seedIfEmpty();
+  await seedIfEmpty();
 
-  // On Vercel, don't bind to a port — the serverless runtime handles that
   if (!process.env.VERCEL) {
-    server.listen(PORT, '0.0.0.0', () => {
+    app.listen(PORT, '0.0.0.0', () => {
       const os = require('os');
       const interfaces = os.networkInterfaces();
       let localIp = 'localhost';
       for (const name of Object.keys(interfaces)) {
         for (const iface of interfaces[name]) {
-          if (iface.family === 'IPv4' && !iface.internal) {
-            localIp = iface.address;
-            break;
-          }
+          if (iface.family === 'IPv4' && !iface.internal) { localIp = iface.address; break; }
         }
       }
       console.log('');
       console.log('  ======================================================');
-      console.log('         THE STUDIO POS -- Server v3.0 (Cloud-Ready)     ');
+      console.log('     THE STUDIO POS v4.0 — Supabase Edition             ');
       console.log('  ======================================================');
       console.log(`  Local:     http://localhost:${PORT}`);
       console.log(`  Network:   http://${localIp}:${PORT}`);
-      console.log('');
-      console.log('  Routes:');
-      console.log('    POS:        /');
-      console.log('    Admin:      /admin');
-      console.log('    KDS Barra:  /kds/barra');
-      console.log('    KDS Cocina: /kds/cocina');
-      console.log('');
-      console.log('  Default Users (POS):');
-      console.log('    Admin:       PIN 123456');
-      console.log('    Supervisor:  PIN 654321');
-      console.log('    Cajero 1:    PIN 111111');
-      console.log('    Cajero 2:    PIN 222222');
-      console.log('    Cubreturno:  PIN 333333');
-      console.log('  KDS Only:');
-      console.log('    Barista 1:   PIN 444444');
-      console.log('    Cocina 1:    PIN 555555');
       console.log('  ======================================================');
       console.log('');
     });
   }
 }
 
-// On Vercel, initialize the database eagerly so the app is ready to handle requests
 if (process.env.VERCEL) {
-  initDatabase().then(() => seedIfEmpty()).catch(err => {
-    console.error('Failed to initialize database on Vercel:', err);
-  });
+  seedIfEmpty().catch(err => console.error('Seed error on Vercel:', err));
 } else {
-  start().catch(err => {
-    console.error('Failed to start server:', err);
-    process.exit(1);
-  });
+  start().catch(err => { console.error('Failed to start:', err); process.exit(1); });
 }
 
-// Export the Express app for Vercel serverless functions
 module.exports = app;

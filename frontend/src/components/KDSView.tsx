@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
-import socket from '../socket';
+import { subscribeKds, unsubscribe } from '../realtime';
+import type { RealtimeChannel } from '@supabase/supabase-js';
 import type { KdsItem } from '../api';
 import { fetchKdsItems, fetchKdsHistory, updateKdsItem } from '../api';
 import WasteModal from './WasteModal';
@@ -73,38 +74,35 @@ export default function KDSView({ station, title }: { station: string; title: st
     fetchKdsHistory(station).then(setHistoryItems).catch(console.error);
   }, [station]);
 
-  // Initial load + socket setup — runs once per station
+  // Initial load + Supabase Realtime setup — runs once per station
   useEffect(() => {
     loadItems();
-    socket.emit('kds:join', station);
 
-    const onNew = (item: KdsItem) => {
-      if (item.station !== station) return;
-      setItems((prev) => prev.some((k) => k.id === item.id) ? prev : [...prev, item]);
-    };
-
-    const onUpdated = (item: KdsItem) => {
-      if (item.station !== station) return;
-      setItems((prev) => {
-        if (item.status === 'delivered') {
-          return prev.filter((k) => k.id !== item.id);
-        }
-        // If item was delivered but now reverted (undo), add it back
-        const exists = prev.some(k => k.id === item.id);
-        if (exists) {
-          return prev.map((k) => k.id === item.id ? item : k);
-        }
-        // Item was in delivered state, add back to active
-        return [...prev, item];
-      });
-    };
-
-    socket.on('kds:new-item', onNew);
-    socket.on('kds:item-updated', onUpdated);
+    const channel = subscribeKds(
+      station,
+      // onInsert
+      (newItem: any) => {
+        const item: KdsItem = { ...newItem, modifiers: newItem.modifiers_json || [] };
+        setItems((prev) => prev.some((k) => k.id === item.id) ? prev : [...prev, item]);
+      },
+      // onUpdate
+      (updatedItem: any) => {
+        const item: KdsItem = { ...updatedItem, modifiers: updatedItem.modifiers_json || [] };
+        setItems((prev) => {
+          if (item.status === 'delivered') {
+            return prev.filter((k) => k.id !== item.id);
+          }
+          const exists = prev.some(k => k.id === item.id);
+          if (exists) {
+            return prev.map((k) => k.id === item.id ? item : k);
+          }
+          return [...prev, item];
+        });
+      }
+    );
 
     return () => {
-      socket.off('kds:new-item', onNew);
-      socket.off('kds:item-updated', onUpdated);
+      unsubscribe(channel);
     };
   }, [station, loadItems]);
 
