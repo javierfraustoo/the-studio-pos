@@ -99,8 +99,24 @@ body {
   border-color: var(--border);
 }
 
-[data-theme="dark"] input::placeholder {
+[data-theme="dark"] input::placeholder,
+[data-theme="dark"] textarea::placeholder {
   color: var(--text-faint);
+}
+
+/* Fix dropdown options in dark mode (native <option> elements) */
+[data-theme="dark"] select option {
+  background-color: #1E293B;
+  color: #F1F5F9;
+}
+
+[data-theme="dark"] select option:checked {
+  background-color: #334155;
+}
+
+/* Ensure select arrows are visible in dark mode */
+[data-theme="dark"] select {
+  color-scheme: dark;
 }
 
 /* Scrollbar in dark mode */

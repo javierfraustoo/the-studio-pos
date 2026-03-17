@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useStore } from '../store/useStore';
 import * as api from '../api';
 import type { RecipeCostCard } from '../api';
@@ -901,16 +901,22 @@ function AuditViewer() {
   const [filterFrom, setFilterFrom] = useState('');
   const [filterTo, setFilterTo] = useState('');
 
-  const load = (role: string, action: string, from: string, to: string) => {
-    const filters: api.AuditFilters = { limit: 200 };
+  const load = useCallback((role: string, action: string, from: string, to: string) => {
+    const filters: api.AuditFilters = { limit: 50 };
     if (role) filters.role = role;
     if (action) filters.action = action;
     if (from) (filters as any).from = from;
     if (to) (filters as any).to = to;
     api.fetchAuditLog(filters).then(r => { setLogs(r.logs); setTotal(r.total); });
-  };
+  }, []);
 
-  useEffect(() => { load(filterRole, filterAction, filterFrom, filterTo); }, [filterRole, filterAction, filterFrom, filterTo]);
+  // Debounced filter: waits 400ms after last change before querying
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      load(filterRole, filterAction, filterFrom, filterTo);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [filterRole, filterAction, filterFrom, filterTo, load]);
 
   const actionLabel = (a: string) => {
     const map: Record<string, string> = {

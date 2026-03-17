@@ -60,11 +60,11 @@ export default function WasteScreen() {
             <label style={styles.label}>Tipo de merma</label>
             <div style={styles.toggleRow}>
               <button onClick={() => { setWasteType('product'); setSelectedId(''); }}
-                style={{ ...styles.toggleBtn, backgroundColor: wasteType === 'product' ? '#1F2937' : '#F3F4F6', color: wasteType === 'product' ? '#FFF' : '#374151' }}>
+                style={{ ...styles.toggleBtn, backgroundColor: wasteType === 'product' ? 'var(--accent)' : 'var(--bg-hover)', color: wasteType === 'product' ? 'var(--accent-text)' : 'var(--text-secondary)' }}>
                 Producto terminado
               </button>
               <button onClick={() => { setWasteType('supply'); setSelectedId(''); }}
-                style={{ ...styles.toggleBtn, backgroundColor: wasteType === 'supply' ? '#1F2937' : '#F3F4F6', color: wasteType === 'supply' ? '#FFF' : '#374151' }}>
+                style={{ ...styles.toggleBtn, backgroundColor: wasteType === 'supply' ? 'var(--accent)' : 'var(--bg-hover)', color: wasteType === 'supply' ? 'var(--accent-text)' : 'var(--text-secondary)' }}>
                 Insumo / Materia prima
               </button>
             </div>
@@ -89,7 +89,7 @@ export default function WasteScreen() {
             <div style={styles.reasonGrid}>
               {REASONS.map((r) => (
                 <button key={r.value} onClick={() => setReason(r.value)}
-                  style={{ ...styles.reasonBtn, backgroundColor: reason === r.value ? '#1F2937' : '#FFF', color: reason === r.value ? '#FFF' : '#374151', borderColor: reason === r.value ? '#1F2937' : '#D1D5DB' }}>
+                  style={{ ...styles.reasonBtn, backgroundColor: reason === r.value ? 'var(--accent)' : 'var(--bg-card)', color: reason === r.value ? 'var(--accent-text)' : 'var(--text-secondary)', borderColor: reason === r.value ? 'var(--accent)' : 'var(--border)' }}>
                   <span>{r.icon}</span>
                   <span style={{ fontSize: 12 }}>{r.label}</span>
                 </button>
@@ -152,29 +152,29 @@ export default function WasteScreen() {
 
 const styles: Record<string, React.CSSProperties> = {
   container: { padding: 24, height: '100%', overflowY: 'auto' },
-  title: { fontSize: 22, fontWeight: 700, color: '#111827', margin: 0 },
-  subtitle: { fontSize: 13, color: '#9CA3AF', margin: '4px 0 20px' },
+  title: { fontSize: 22, fontWeight: 700, color: 'var(--text-primary)', margin: 0 },
+  subtitle: { fontSize: 13, color: 'var(--text-faint)', margin: '4px 0 20px' },
   formGrid: { display: 'flex', gap: 24 },
   form: { flex: 1, display: 'flex', flexDirection: 'column', gap: 16 },
   field: { display: 'flex', flexDirection: 'column', gap: 6 },
-  label: { fontSize: 12, fontWeight: 700, color: '#374151', textTransform: 'uppercase' as const, letterSpacing: 0.5 },
+  label: { fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase' as const, letterSpacing: 0.5 },
   toggleRow: { display: 'flex', gap: 8 },
   toggleBtn: { flex: 1, padding: '10px 0', borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: 13 },
-  select: { padding: '10px 12px', borderRadius: 10, border: '1px solid #D1D5DB', fontSize: 14, outline: 'none', backgroundColor: '#FFF' },
-  input: { padding: '10px 12px', borderRadius: 10, border: '1px solid #D1D5DB', fontSize: 14, outline: 'none' },
+  select: { padding: '10px 12px', borderRadius: 10, border: '1px solid var(--border)', fontSize: 14, outline: 'none', backgroundColor: 'var(--bg-input)', color: 'var(--text-primary)' },
+  input: { padding: '10px 12px', borderRadius: 10, border: '1px solid var(--border)', fontSize: 14, outline: 'none', backgroundColor: 'var(--bg-input)', color: 'var(--text-primary)', boxSizing: 'border-box' as const },
   reasonGrid: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 },
   reasonBtn: { padding: '10px 8px', borderRadius: 10, border: '1.5px solid', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, fontWeight: 500, transition: 'all 0.15s' },
-  submitBtn: { padding: '14px 0', borderRadius: 12, border: 'none', backgroundColor: '#DC2626', color: '#FFF', fontSize: 15, fontWeight: 700, cursor: 'pointer' },
-  logPanel: { width: 320, backgroundColor: '#FFF', borderRadius: 16, border: '1px solid #E5E7EB', padding: 16, overflowY: 'auto', maxHeight: 500 },
-  logTitle: { fontSize: 14, fontWeight: 700, color: '#111827', margin: '0 0 12px' },
-  logEmpty: { color: '#9CA3AF', fontSize: 13, textAlign: 'center', marginTop: 40 },
-  logItem: { padding: '10px 0', borderBottom: '1px solid #F3F4F6' },
+  submitBtn: { padding: '14px 0', borderRadius: 12, border: 'none', backgroundColor: 'var(--danger)', color: '#FFF', fontSize: 15, fontWeight: 700, cursor: 'pointer' },
+  logPanel: { width: 320, backgroundColor: 'var(--bg-card)', borderRadius: 16, border: '1px solid var(--border)', padding: 16, overflowY: 'auto', maxHeight: 500 },
+  logTitle: { fontSize: 14, fontWeight: 700, color: 'var(--text-primary)', margin: '0 0 12px' },
+  logEmpty: { color: 'var(--text-faint)', fontSize: 13, textAlign: 'center', marginTop: 40 },
+  logItem: { padding: '10px 0', borderBottom: '1px solid var(--border-light)' },
   logItemTop: { display: 'flex', justifyContent: 'space-between' },
-  logItemName: { fontWeight: 600, fontSize: 13, color: '#1F2937' },
-  logItemQty: { fontWeight: 700, fontSize: 13, color: '#DC2626', fontFamily: 'monospace' },
+  logItemName: { fontWeight: 600, fontSize: 13, color: 'var(--text-primary)' },
+  logItemQty: { fontWeight: 700, fontSize: 13, color: 'var(--danger)', fontFamily: 'monospace' },
   logItemBottom: { display: 'flex', justifyContent: 'space-between', marginTop: 4 },
-  logReason: { fontSize: 12, color: '#6B7280' },
-  logTime: { fontSize: 11, color: '#9CA3AF' },
-  logNotes: { fontSize: 12, color: '#D97706', fontStyle: 'italic', margin: '4px 0 0' },
-  logCost: { fontSize: 11, color: '#DC2626', fontWeight: 600 },
+  logReason: { fontSize: 12, color: 'var(--text-muted)' },
+  logTime: { fontSize: 11, color: 'var(--text-faint)' },
+  logNotes: { fontSize: 12, color: 'var(--warning)', fontStyle: 'italic', margin: '4px 0 0' },
+  logCost: { fontSize: 11, color: 'var(--danger)', fontWeight: 600 },
 };

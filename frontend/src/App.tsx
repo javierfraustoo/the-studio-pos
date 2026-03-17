@@ -76,10 +76,10 @@ function MainApp() {
     isAuthenticated, currentUser, logout, reloadMenu, darkMode,
   } = useStore();
 
-  // Apply dark mode on mount
+  // Apply dark mode on mount and when toggled
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', darkMode ? 'dark' : 'light');
-  }, []);
+  }, [darkMode]);
 
   useEffect(() => {
     if (isAuthenticated) init();
