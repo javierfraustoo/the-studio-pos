@@ -1,0 +1,116 @@
+/* ─── Theme CSS Variables ─────────────────────────────────────────────────── */
+:root {
+  /* Light mode (default) */
+  --bg-primary: #F9FAFB;
+  --bg-secondary: #FFFFFF;
+  --bg-tertiary: #FAFAFA;
+  --bg-input: #FFFFFF;
+  --bg-hover: #F3F4F6;
+  --bg-card: #FFFFFF;
+  --bg-header: #FFFFFF;
+  --bg-kds: #111827;
+
+  --text-primary: #111827;
+  --text-secondary: #374151;
+  --text-muted: #6B7280;
+  --text-faint: #9CA3AF;
+
+  --border: #E5E7EB;
+  --border-light: #F3F4F6;
+
+  --accent: #1F2937;
+  --accent-text: #FFFFFF;
+
+  --danger: #DC2626;
+  --danger-bg: #FEE2E2;
+  --success: #059669;
+  --success-bg: #D1FAE5;
+  --warning: #D97706;
+  --warning-bg: #FEF3C7;
+  --info: #2563EB;
+  --info-bg: #DBEAFE;
+
+  --shadow: rgba(0,0,0,0.1);
+  --overlay: rgba(0,0,0,0.5);
+
+  /* KDS specific */
+  --kds-card-bg: #1E293B;
+  --kds-text: #F8FAFC;
+}
+
+/* Dark mode */
+[data-theme="dark"] {
+  --bg-primary: #0F172A;
+  --bg-secondary: #1E293B;
+  --bg-tertiary: #1E293B;
+  --bg-input: #334155;
+  --bg-hover: #334155;
+  --bg-card: #1E293B;
+  --bg-header: #0F172A;
+  --bg-kds: #0F172A;
+
+  --text-primary: #F1F5F9;
+  --text-secondary: #CBD5E1;
+  --text-muted: #94A3B8;
+  --text-faint: #64748B;
+
+  --border: #334155;
+  --border-light: #1E293B;
+
+  --accent: #3B82F6;
+  --accent-text: #FFFFFF;
+
+  --danger: #EF4444;
+  --danger-bg: #451A1A;
+  --success: #10B981;
+  --success-bg: #14332A;
+  --warning: #F59E0B;
+  --warning-bg: #422006;
+  --info: #3B82F6;
+  --info-bg: #1E3A5F;
+
+  --shadow: rgba(0,0,0,0.4);
+  --overlay: rgba(0,0,0,0.7);
+
+  --kds-card-bg: #334155;
+  --kds-text: #F8FAFC;
+}
+
+/* Global body styles tied to theme */
+body {
+  margin: 0;
+  padding: 0;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+/* Smooth theme transitions */
+*, *::before, *::after {
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.1s ease;
+}
+
+/* Override for inputs in dark mode */
+[data-theme="dark"] input,
+[data-theme="dark"] select,
+[data-theme="dark"] textarea {
+  background-color: var(--bg-input);
+  color: var(--text-primary);
+  border-color: var(--border);
+}
+
+[data-theme="dark"] input::placeholder {
+  color: var(--text-faint);
+}
+
+/* Scrollbar in dark mode */
+[data-theme="dark"] ::-webkit-scrollbar {
+  width: 8px;
+}
+[data-theme="dark"] ::-webkit-scrollbar-track {
+  background: var(--bg-primary);
+}
+[data-theme="dark"] ::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 4px;
+}

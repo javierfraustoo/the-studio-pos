@@ -1,0 +1,10 @@
+{
+  "name": "the-studio-pos",
+  "version": "3.0.0",
+  "private": true,
+  "scripts": {
+    "build": "cd frontend && npm install && npm run build",
+    "dev": "cd server && npm run dev",
+    "install:all": "cd frontend && npm install && cd ../server && npm install"
+  }
+}
