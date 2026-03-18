@@ -23,7 +23,7 @@ function DarkModeToggle() {
   const { darkMode, toggleDarkMode } = useStore();
   return (
     <button onClick={toggleDarkMode} title={darkMode ? 'Modo Claro' : 'Modo Oscuro'}
-      style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, borderRadius: 10, border: '1px solid rgba(255,255,255,0.08)', backgroundColor: 'rgba(255,255,255,0.04)', cursor: 'pointer', color: '#A1A1AA' }}>
+      style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, borderRadius: 10, border: '1px solid rgba(255,255,255,0.08)', backgroundColor: 'rgba(255,255,255,0.04)', cursor: 'pointer', color: 'var(--text-muted)' }}>
       {darkMode ? <Sun size={15} /> : <Moon size={15} />}
     </button>
   );
@@ -61,7 +61,7 @@ function MainApp() {
     isAuthenticated, currentUser, logout, reloadMenu, darkMode,
   } = useStore();
 
-  useEffect(() => { document.documentElement.setAttribute('data-theme', 'dark'); }, [darkMode]);
+  useEffect(() => { document.documentElement.setAttribute('data-theme', darkMode ? 'dark' : 'light'); }, [darkMode]);
   useEffect(() => { if (isAuthenticated) init(); }, [isAuthenticated]);
   useEffect(() => {
     const channel = subscribePosEvents({
@@ -79,9 +79,9 @@ function MainApp() {
     const station = currentUser.operator_type === 'barista' ? 'bar' : 'kitchen';
     const title = currentUser.operator_type === 'barista' ? 'KDS Barra' : 'KDS Cocina';
     return (
-      <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: '#09090B' }}>
+      <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--bg-primary)' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 20px', backgroundColor: 'rgba(24,24,27,0.85)', backdropFilter: 'blur(16px)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-          <span style={{ color: '#FAFAFA', fontSize: 14, fontWeight: 700, letterSpacing: '-0.01em' }}>{currentUser?.name} — {title}</span>
+          <span style={{ color: 'var(--text-primary)', fontSize: 14, fontWeight: 700, letterSpacing: '-0.01em' }}>{currentUser?.name} — {title}</span>
           <div style={{ display: 'flex', gap: 8 }}>
             <DarkModeToggle />
             <button onClick={logout} style={{ padding: '6px 14px', borderRadius: 10, border: '1px solid rgba(239,68,68,0.3)', backgroundColor: 'transparent', color: '#EF4444', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Salir</button>
@@ -94,10 +94,10 @@ function MainApp() {
 
   if (!menuLoaded) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', backgroundColor: '#09090B' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', backgroundColor: 'var(--bg-primary)' }}>
         <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: 36, fontWeight: 800, color: '#FAFAFA', marginBottom: 12, letterSpacing: '-0.03em' }}>THE STUDIO</div>
-          <div style={{ fontSize: 12, color: '#52525B', fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase' as const }}>Conectando al servidor...</div>
+          <div style={{ fontSize: 36, fontWeight: 800, color: 'var(--text-primary)', marginBottom: 12, letterSpacing: '-0.03em' }}>THE STUDIO</div>
+          <div style={{ fontSize: 12, color: 'var(--text-faint)', fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase' as const }}>Conectando al servidor...</div>
         </div>
       </div>
     );
@@ -181,7 +181,7 @@ export default function App() {
 }
 
 const S: Record<string, React.CSSProperties> = {
-  app: { height: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: '#09090B', fontFamily: "'Inter', -apple-system, system-ui, sans-serif" },
+  app: { height: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--bg-primary)', fontFamily: "'Inter', -apple-system, system-ui, sans-serif" },
 
   // Header — Glassmorphism
   header: {
@@ -198,7 +198,7 @@ const S: Record<string, React.CSSProperties> = {
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     fontSize: 14, fontWeight: 800, color: '#FFF', letterSpacing: -1,
   },
-  brandName: { fontSize: 14, fontWeight: 700, color: '#FAFAFA', letterSpacing: '0.04em' },
+  brandName: { fontSize: 14, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '0.04em' },
 
   nav: { display: 'flex', gap: 1, marginLeft: 16, flex: 1 },
   navBtn: {
@@ -225,12 +225,12 @@ const S: Record<string, React.CSSProperties> = {
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     fontSize: 11, fontWeight: 700, color: '#FFF',
   },
-  userName: { fontSize: 12, fontWeight: 600, color: '#D4D4D8' },
-  userRole: { fontSize: 10, color: '#52525B', fontWeight: 500 },
+  userName: { fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)' },
+  userRole: { fontSize: 10, color: 'var(--text-faint)', fontWeight: 500 },
 
   iconBtn: {
     width: 34, height: 34, borderRadius: 10, border: '1px solid rgba(255,255,255,0.08)',
-    backgroundColor: 'rgba(255,255,255,0.04)', cursor: 'pointer', color: '#71717A',
+    backgroundColor: 'rgba(255,255,255,0.04)', cursor: 'pointer', color: 'var(--text-muted)',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
   },
   logoutBtn: {

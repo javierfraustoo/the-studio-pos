@@ -1013,7 +1013,7 @@ function AuditViewer() {
                   <td style={tdStyle}><span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{l.user_name || '-'}</span></td>
                   <td style={tdStyle}><span style={{ ...S.badge, backgroundColor: ac.bg, color: ac.color }}>{actionLabel(l.action)}</span></td>
                   <td style={tdStyle}>{l.entity_type || '-'}</td>
-                  <td style={{ ...tdStyle, maxWidth: 250, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.details || '-'}</td>
+                  <td style={{ ...tdStyle, maxWidth: 250, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.details ? (typeof l.details === 'string' ? l.details : JSON.stringify(l.details)) : '-'}</td>
                 </tr>
               );
             })}
@@ -1043,11 +1043,11 @@ export default function AdminScreen() {
 
   const tabs: Array<{ id: AdminTab; label: string }> = [
     { id: 'products', label: 'Productos' },
-    { id: 'categories', label: 'Categorias' },
+    { id: 'categories', label: 'Categorías' },
     { id: 'modifiers', label: 'Modificadores' },
     { id: 'inventory', label: 'Insumos' },
     { id: 'users', label: 'Usuarios' },
-    { id: 'audit', label: 'Auditoria' },
+    { id: 'audit', label: 'Auditoría' },
   ];
 
   return (

@@ -1,12 +1,56 @@
 /* ═══════════════════════════════════════════════════════════════════════════
    THE STUDIO POS — Premium Design System
-   Inspired by Apple + Miyagi Labs Finance Aesthetic
+   Apple + Miyagi Labs Finance Aesthetic — Light & Dark
    ═══════════════════════════════════════════════════════════════════════════ */
 
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
 
+/* ─── Light Theme (Default) ───────────────────────────────────────────── */
 :root {
-  /* ─── Premium Dark (Default & Only Theme) ─── */
+  --bg-primary: #F5F5F7;
+  --bg-secondary: #FFFFFF;
+  --bg-tertiary: #FAFAFA;
+  --bg-input: #FFFFFF;
+  --bg-hover: #F0F0F2;
+  --bg-card: #FFFFFF;
+  --bg-header: rgba(255,255,255,0.82);
+
+  --text-primary: #1D1D1F;
+  --text-secondary: #3A3A3C;
+  --text-muted: #6E6E73;
+  --text-faint: #AEAEB2;
+
+  --border: rgba(0,0,0,0.08);
+  --border-light: rgba(0,0,0,0.04);
+  --border-hover: rgba(0,0,0,0.15);
+
+  --accent: #10B981;
+  --accent-text: #FFFFFF;
+  --accent-glow: rgba(16,185,129,0.10);
+  --accent-hover: #059669;
+
+  --danger: #DC2626;
+  --danger-bg: rgba(220,38,38,0.08);
+  --success: #059669;
+  --success-bg: rgba(5,150,105,0.08);
+  --warning: #D97706;
+  --warning-bg: rgba(217,119,6,0.08);
+  --info: #2563EB;
+  --info-bg: rgba(37,99,235,0.08);
+
+  --shadow: rgba(0,0,0,0.08);
+  --shadow-lg: rgba(0,0,0,0.12);
+  --overlay: rgba(0,0,0,0.4);
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --radius-2xl: 24px;
+}
+
+/* ─── Dark Theme ──────────────────────────────────────────────────────── */
+[data-theme="dark"] {
   --bg-primary: #09090B;
   --bg-secondary: #18181B;
   --bg-tertiary: #1C1C1F;
@@ -14,7 +58,6 @@
   --bg-hover: #27272A;
   --bg-card: #18181B;
   --bg-header: rgba(9,9,11,0.82);
-  --bg-kds: #09090B;
 
   --text-primary: #FAFAFA;
   --text-secondary: #D4D4D8;
@@ -40,54 +83,26 @@
   --info-bg: rgba(59,130,246,0.12);
 
   --shadow: rgba(0,0,0,0.5);
+  --shadow-lg: rgba(0,0,0,0.6);
   --overlay: rgba(0,0,0,0.75);
-
-  --kds-card-bg: #18181B;
-  --kds-text: #FAFAFA;
-
-  /* Radius */
-  --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 16px;
-  --radius-xl: 20px;
-  --radius-2xl: 24px;
-}
-
-/* Keep data-theme="dark" for backwards compatibility */
-[data-theme="dark"] {
-  /* All same as :root — single premium dark theme */
 }
 
 /* ─── Global Resets ───────────────────────────────────────────────────── */
 
-* {
-  box-sizing: border-box;
-}
+* { box-sizing: border-box; }
 
 body {
-  margin: 0;
-  padding: 0;
+  margin: 0; padding: 0;
   background-color: var(--bg-primary);
   color: var(--text-primary);
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+  transition: background-color 0.3s ease, color 0.2s ease;
 }
 
-/* ─── Typography ──────────────────────────────────────────────────────── */
-
-h1, h2, h3, h4 {
-  letter-spacing: -0.025em;
-  font-weight: 700;
-}
-
-/* Tabular nums for prices, quantities, timers */
-.tabular-nums,
-[style*="fontFamily: 'monospace'"],
-[style*="monospace"] {
-  font-variant-numeric: tabular-nums;
-}
+h1, h2, h3, h4 { letter-spacing: -0.025em; font-weight: 700; }
 
 /* ─── Form Elements ───────────────────────────────────────────────────── */
 
@@ -95,42 +110,22 @@ input, select, textarea {
   background-color: var(--bg-input);
   color: var(--text-primary);
   border-color: var(--border);
-  color-scheme: dark;
+  transition: background-color 0.2s, color 0.2s, border-color 0.2s;
 }
 
-input::placeholder,
-textarea::placeholder {
-  color: var(--text-faint);
-}
+[data-theme="dark"] select { color-scheme: dark; }
 
-select option {
-  background-color: #27272A;
-  color: #FAFAFA;
-}
+input::placeholder, textarea::placeholder { color: var(--text-faint); }
 
-select option:checked {
-  background-color: #3F3F46;
-}
+[data-theme="dark"] select option { background-color: #27272A; color: #FAFAFA; }
+[data-theme="dark"] select option:checked { background-color: #3F3F46; }
 
-/* ─── Scrollbars (Minimal) ────────────────────────────────────────────── */
+/* ─── Scrollbars ──────────────────────────────────────────────────────── */
 
-::-webkit-scrollbar {
-  width: 5px;
-  height: 5px;
-}
-
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-::-webkit-scrollbar-thumb {
-  background: rgba(255,255,255,0.08);
-  border-radius: 10px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(255,255,255,0.15);
-}
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-hover); border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-faint); }
 
 /* ─── Micro-interactions ──────────────────────────────────────────────── */
 
@@ -138,42 +133,23 @@ button {
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   cursor: pointer;
 }
-
-button:active:not(:disabled) {
-  transform: scale(0.97);
-}
-
-/* Nav buttons */
-nav button:hover:not(:disabled) {
-  background-color: rgba(255,255,255,0.06) !important;
-}
+button:active:not(:disabled) { transform: scale(0.97); }
 
 /* Product card hover */
 button[data-product]:hover {
   transform: scale(1.02);
   border-color: var(--border-hover) !important;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+  box-shadow: 0 8px 32px var(--shadow-lg);
 }
 
-/* Table row hover */
-details summary:hover {
-  background-color: var(--bg-hover) !important;
-}
+details summary:hover { background-color: var(--bg-hover) !important; }
 
-/* Focus visible for accessibility */
-button:focus-visible,
-input:focus-visible,
-select:focus-visible {
+button:focus-visible, input:focus-visible, select:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 
-/* ─── Selection Color ─────────────────────────────────────────────────── */
-
-::selection {
-  background-color: rgba(16,185,129,0.3);
-  color: #FFFFFF;
-}
+::selection { background-color: rgba(16,185,129,0.3); color: #FFFFFF; }
 
 /* ─── Animations ──────────────────────────────────────────────────────── */
 
@@ -185,9 +161,4 @@ select:focus-visible {
 @keyframes slideUp {
   from { opacity: 0; transform: translateY(12px); }
   to { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes pulse-glow {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(16,185,129,0); }
-  50% { box-shadow: 0 0 20px 4px rgba(16,185,129,0.15); }
 }

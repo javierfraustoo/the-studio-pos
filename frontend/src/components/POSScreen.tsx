@@ -138,11 +138,11 @@ function ModifierSheet() {
               <div key={group.id} style={S.modSection}>
                 <button onClick={() => toggleCollapse(group.id)} style={S.modSectionHeader}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontSize: 14, color: '#52525B' }}>{isCollapsed ? '▸' : '▾'}</span>
+                    <span style={{ fontSize: 14, color: 'var(--text-faint)' }}>{isCollapsed ? '▸' : '▾'}</span>
                     <span style={S.modGroupTitle}>{group.name}</span>
                     {group.isRequired && <span style={S.required}>requerido</span>}
                   </div>
-                  {summary && <span style={{ fontSize: 12, color: '#71717A' }}>{summary}</span>}
+                  {summary && <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{summary}</span>}
                 </button>
                 {!isCollapsed && (
                   <div style={S.modOptions}>
@@ -170,10 +170,10 @@ function ModifierSheet() {
           <div style={S.modSection}>
             <button onClick={() => toggleCollapse('__notes__')} style={S.modSectionHeader}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ fontSize: 14, color: '#52525B' }}>{collapsed['__notes__'] ? '▸' : '▾'}</span>
+                <span style={{ fontSize: 14, color: 'var(--text-faint)' }}>{collapsed['__notes__'] ? '▸' : '▾'}</span>
                 <span style={S.modGroupTitle}>Notas</span>
               </div>
-              {notes && <span style={{ fontSize: 12, color: '#71717A' }}>{notes.substring(0, 25)}...</span>}
+              {notes && <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{notes.substring(0, 25)}...</span>}
             </button>
             {!collapsed['__notes__'] && (
               <input type="text" value={notes} onChange={(e) => setNotes(e.target.value)}
@@ -218,9 +218,9 @@ function CartPanel() {
       <div style={S.cartPanel}>
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
           <div style={{ width: 56, height: 56, borderRadius: 28, background: 'linear-gradient(135deg, #10B981, #059669)', color: '#FFF', fontSize: 28, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>✓</div>
-          <h2 style={{ fontSize: 24, fontWeight: 800, margin: 0, color: '#FAFAFA', letterSpacing: '-0.02em' }}>Orden #{lastOrder.orderNumber}</h2>
-          <p style={{ fontSize: 14, color: '#71717A', margin: '6px 0 0' }}>{lastOrder.paymentMethod === 'cash' ? 'Efectivo' : 'Tarjeta'} — ${lastOrder.total.toFixed(2)}</p>
-          <p style={{ fontSize: 11, color: '#3F3F46', marginTop: 8 }}>Enviado a KDS</p>
+          <h2 style={{ fontSize: 24, fontWeight: 800, margin: 0, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>Orden #{lastOrder.orderNumber}</h2>
+          <p style={{ fontSize: 14, color: 'var(--text-muted)', margin: '6px 0 0' }}>{lastOrder.paymentMethod === 'cash' ? 'Efectivo' : 'Tarjeta'} — ${lastOrder.total.toFixed(2)}</p>
+          <p style={{ fontSize: 11, color: 'var(--text-faint)', marginTop: 8 }}>Enviado a KDS</p>
           <button onClick={() => setLastOrder(null)} style={{ ...S.checkoutBtn, marginTop: 24, width: '80%' }}>Nueva orden</button>
         </div>
       </div>
@@ -231,11 +231,11 @@ function CartPanel() {
     return (
       <div style={S.cartPanel}>
         <div style={{ padding: '16px 16px 0' }}>
-          <button onClick={() => setShowCheckout(false)} style={{ fontSize: 13, color: '#A1A1AA', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>← Pedido</button>
+          <button onClick={() => setShowCheckout(false)} style={{ fontSize: 13, color: 'var(--text-muted)', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>← Pedido</button>
         </div>
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24, gap: 16 }}>
-          <h2 style={{ fontSize: 44, fontWeight: 800, margin: 0, color: '#FAFAFA', letterSpacing: '-0.03em' }}>${subtotal.toFixed(2)}</h2>
-          <p style={{ fontSize: 13, color: '#52525B', margin: 0 }}>Total a cobrar</p>
+          <h2 style={{ fontSize: 44, fontWeight: 800, margin: 0, color: 'var(--text-primary)', letterSpacing: '-0.03em' }}>${subtotal.toFixed(2)}</h2>
+          <p style={{ fontSize: 13, color: 'var(--text-faint)', margin: 0 }}>Total a cobrar</p>
           <button onClick={() => handlePay('cash')} disabled={processing}
             style={{ ...S.payBtn, background: 'linear-gradient(135deg, #059669, #10B981)' }}>
             {processing ? 'Procesando...' : 'Efectivo'}
@@ -252,7 +252,7 @@ function CartPanel() {
   return (
     <div style={S.cartPanel}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 16px 0' }}>
-        <h2 style={{ fontSize: 15, fontWeight: 700, margin: 0, color: '#FAFAFA', letterSpacing: '-0.01em' }}>Pedido</h2>
+        <h2 style={{ fontSize: 15, fontWeight: 700, margin: 0, color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>Pedido</h2>
         {cart.length > 0 && <button onClick={() => setShowClearConfirm(true)} style={{ fontSize: 11, color: '#EF4444', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 500 }}>Limpiar</button>}
       </div>
       <div style={{ padding: '8px 16px', display: 'flex', gap: 4 }}>
@@ -269,18 +269,18 @@ function CartPanel() {
 
       <div style={{ flex: 1, overflowY: 'auto', padding: '0 16px' }}>
         {cart.length === 0 ? (
-          <p style={{ color: '#3F3F46', textAlign: 'center', marginTop: 40, fontSize: 13 }}>Agrega productos</p>
+          <p style={{ color: 'var(--text-faint)', textAlign: 'center', marginTop: 40, fontSize: 13 }}>Agrega productos</p>
         ) : cart.map((item) => (
           <div key={item.cartItemId} style={{ padding: '10px 0', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ fontWeight: 600, fontSize: 13, color: '#FAFAFA' }}>{item.product.name}</span>
-              <span style={{ fontWeight: 600, fontSize: 13, color: '#FAFAFA', fontVariantNumeric: 'tabular-nums' }}>${item.lineTotal}</span>
+              <span style={{ fontWeight: 600, fontSize: 13, color: 'var(--text-primary)' }}>{item.product.name}</span>
+              <span style={{ fontWeight: 600, fontSize: 13, color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>${item.lineTotal}</span>
             </div>
             {item.modifiers.length > 0 && <div style={{ display: 'flex', gap: 4, marginTop: 4, flexWrap: 'wrap' }}>{item.modifiers.map((m) => <span key={m.id} style={S.modTag}>{m.shortName}{m.priceAdjustment > 0 ? ` +$${m.priceAdjustment}` : ''}</span>)}</div>}
             {item.notes && <p style={{ fontSize: 11, color: '#F59E0B', margin: '4px 0 0', fontStyle: 'italic' }}>{item.notes}</p>}
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
               <button onClick={() => updateQuantity(item.cartItemId, -1)} style={S.qtyBtn}>−</button>
-              <span style={{ fontWeight: 600, fontSize: 13, minWidth: 18, textAlign: 'center', color: '#FAFAFA' }}>{item.quantity}</span>
+              <span style={{ fontWeight: 600, fontSize: 13, minWidth: 18, textAlign: 'center', color: 'var(--text-primary)' }}>{item.quantity}</span>
               <button onClick={() => updateQuantity(item.cartItemId, 1)} style={S.qtyBtn}>+</button>
               <button onClick={() => removeFromCart(item.cartItemId)} style={{ marginLeft: 'auto', fontSize: 11, color: '#EF4444', background: 'none', border: 'none', cursor: 'pointer', opacity: 0.7 }}>Quitar</button>
             </div>
@@ -291,8 +291,8 @@ function CartPanel() {
       {cart.length > 0 && (
         <div style={{ padding: 16, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
-            <span style={{ fontWeight: 600, fontSize: 14, color: '#A1A1AA' }}>Total</span>
-            <span style={{ fontWeight: 800, fontSize: 20, color: '#FAFAFA', fontVariantNumeric: 'tabular-nums' }}>${subtotal.toFixed(2)}</span>
+            <span style={{ fontWeight: 600, fontSize: 14, color: 'var(--text-muted)' }}>Total</span>
+            <span style={{ fontWeight: 800, fontSize: 20, color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>${subtotal.toFixed(2)}</span>
           </div>
           <button onClick={() => setShowCheckout(true)} style={S.checkoutBtn}>Cobrar ${subtotal.toFixed(0)}</button>
         </div>
@@ -323,8 +323,8 @@ export default function POSScreen() {
 // ─── Styles ─────────────────────────────────────────────────────────────────
 
 const S: Record<string, React.CSSProperties> = {
-  posLayout: { display: 'flex', height: '100%' },
-  menuSide: { flex: 1, minWidth: '75%', display: 'flex', flexDirection: 'column', padding: 16, overflowY: 'auto', backgroundColor: '#09090B' },
+  posLayout: { display: 'flex', height: '100%', width: '100%' },
+  menuSide: { width: '75%', flex: '0 0 75%', display: 'flex', flexDirection: 'column', padding: 16, overflowY: 'auto', backgroundColor: 'var(--bg-primary)', minWidth: 0 },
   categoryBar: { display: 'flex', gap: 6, marginBottom: 14, flexWrap: 'wrap' },
   categoryTab: { padding: '8px 18px', borderRadius: 12, border: '1px solid', cursor: 'pointer', fontWeight: 600, fontSize: 13, transition: 'all 0.2s ease' },
 
@@ -333,32 +333,31 @@ const S: Record<string, React.CSSProperties> = {
     display: 'flex', flexDirection: 'column', justifyContent: 'center',
     padding: '18px 20px', borderRadius: 16,
     border: '1px solid rgba(255,255,255,0.06)',
-    backgroundColor: '#18181B', cursor: 'pointer', textAlign: 'left',
+    backgroundColor: 'var(--bg-card)', cursor: 'pointer', textAlign: 'left',
     minHeight: 100, transition: 'all 0.25s cubic-bezier(0.4,0,0.2,1)',
   },
-  productName: { fontWeight: 700, fontSize: 16, color: '#FAFAFA', lineHeight: 1.3, letterSpacing: '-0.01em' },
-  productPrice: { fontWeight: 600, fontSize: 15, color: '#52525B', marginTop: 6, fontVariantNumeric: 'tabular-nums' },
+  productName: { fontWeight: 700, fontSize: 16, color: 'var(--text-primary)', lineHeight: 1.3, letterSpacing: '-0.01em' },
+  productPrice: { fontWeight: 600, fontSize: 15, color: 'var(--text-faint)', marginTop: 6, fontVariantNumeric: 'tabular-nums' },
 
   cartPanel: {
-    width: '25vw', maxWidth: '25vw', minWidth: 240,
-    backgroundColor: '#111113',
-    borderLeft: '1px solid rgba(255,255,255,0.06)',
+    width: '25%', flex: '0 0 25%',
+    backgroundColor: 'var(--bg-secondary)',
+    borderLeft: '1px solid var(--border)',
     display: 'flex', flexDirection: 'column', height: '100%',
-    flexShrink: 0, flexGrow: 0, flexBasis: '25vw',
   },
   typeBtn: { flex: 1, padding: '7px 0', borderRadius: 8, cursor: 'pointer', fontWeight: 600, fontSize: 12, transition: 'all 0.2s ease' },
   nameInput: {
     margin: '0 16px 8px', padding: '8px 12px', borderRadius: 10,
     border: '1px solid rgba(255,255,255,0.06)', fontSize: 13, outline: 'none',
-    backgroundColor: 'rgba(255,255,255,0.03)', color: '#FAFAFA',
+    backgroundColor: 'rgba(255,255,255,0.03)', color: 'var(--text-primary)',
   },
-  modTag: { fontSize: 10, backgroundColor: 'rgba(255,255,255,0.06)', padding: '2px 6px', borderRadius: 6, color: '#A1A1AA' },
+  modTag: { fontSize: 10, backgroundColor: 'rgba(255,255,255,0.06)', padding: '2px 6px', borderRadius: 6, color: 'var(--text-muted)' },
   qtyBtn: {
     width: 28, height: 28, borderRadius: 8,
     border: '1px solid rgba(255,255,255,0.08)',
     backgroundColor: 'rgba(255,255,255,0.04)', cursor: 'pointer',
     fontWeight: 700, fontSize: 15, display: 'flex', alignItems: 'center', justifyContent: 'center',
-    color: '#D4D4D8',
+    color: 'var(--text-secondary)',
   },
   checkoutBtn: {
     width: '100%', padding: '13px 0', borderRadius: 14, border: 'none',
@@ -375,25 +374,25 @@ const S: Record<string, React.CSSProperties> = {
   overlay: { position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, backdropFilter: 'blur(8px)' },
   sheet: {
     width: '95%', maxWidth: 480, maxHeight: '85vh',
-    backgroundColor: '#18181B', borderRadius: 24,
+    backgroundColor: 'var(--bg-card)', borderRadius: 24,
     display: 'flex', flexDirection: 'column',
     boxShadow: '0 25px 60px rgba(0,0,0,0.5)',
     border: '1px solid rgba(255,255,255,0.08)',
     animation: 'fadeIn 0.2s ease-out',
   },
   sheetHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px 24px 12px' },
-  sheetTitle: { fontSize: 22, fontWeight: 800, color: '#FAFAFA', margin: 0, letterSpacing: '-0.02em' },
-  sheetPrice: { fontSize: 14, fontWeight: 600, color: '#52525B' },
+  sheetTitle: { fontSize: 22, fontWeight: 800, color: 'var(--text-primary)', margin: 0, letterSpacing: '-0.02em' },
+  sheetPrice: { fontSize: 14, fontWeight: 600, color: 'var(--text-faint)' },
   closeBtn: {
     width: 36, height: 36, borderRadius: 12,
     border: '1px solid rgba(255,255,255,0.08)',
     backgroundColor: 'rgba(255,255,255,0.04)', cursor: 'pointer',
-    fontSize: 15, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#71717A',
+    fontSize: 15, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)',
   },
   sheetBody: { flex: 1, overflowY: 'auto', padding: '0 24px 12px' },
   modSection: { marginBottom: 2, borderBottom: '1px solid rgba(255,255,255,0.04)' },
-  modSectionHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', padding: '10px 0', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', color: '#FAFAFA' },
-  modGroupTitle: { fontSize: 11, fontWeight: 700, color: '#71717A', textTransform: 'uppercase' as const, letterSpacing: '0.08em' },
+  modSectionHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', padding: '10px 0', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', color: 'var(--text-primary)' },
+  modGroupTitle: { fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' as const, letterSpacing: '0.08em' },
   required: { fontSize: 9, fontWeight: 600, color: '#FFF', backgroundColor: '#EF4444', padding: '1px 6px', borderRadius: 4 },
   modOptions: { display: 'flex', flexWrap: 'wrap', gap: 6, padding: '2px 0 10px 24px' },
   modBtn: {
@@ -406,7 +405,7 @@ const S: Record<string, React.CSSProperties> = {
     padding: '8px 12px', borderRadius: 10,
     border: '1px solid rgba(255,255,255,0.06)', fontSize: 13, outline: 'none',
     boxSizing: 'border-box' as const,
-    backgroundColor: 'rgba(255,255,255,0.03)', color: '#FAFAFA',
+    backgroundColor: 'rgba(255,255,255,0.03)', color: 'var(--text-primary)',
   },
   addBtn: {
     margin: '0 24px 24px', padding: '13px 0', borderRadius: 14, border: 'none',

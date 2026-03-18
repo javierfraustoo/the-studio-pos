@@ -58,12 +58,12 @@ export default function ConfirmModal({
 
 const styles: Record<string, React.CSSProperties> = {
   overlay: { position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, backdropFilter: 'blur(8px)' },
-  modal: { backgroundColor: '#18181B', borderRadius: 24, padding: '32px 28px 24px', width: 380, textAlign: 'center', boxShadow: '0 25px 60px rgba(0,0,0,0.5)', border: '1px solid rgba(255,255,255,0.08)', animation: 'fadeIn 0.2s ease-out' },
+  modal: { backgroundColor: 'var(--bg-card)', borderRadius: 24, padding: '32px 28px 24px', width: 380, textAlign: 'center', boxShadow: '0 25px 60px rgba(0,0,0,0.5)', border: '1px solid rgba(255,255,255,0.08)', animation: 'fadeIn 0.2s ease-out' },
   iconWrap: { marginBottom: 16 },
   icon: { width: 52, height: 52, borderRadius: 16, fontSize: 24, fontWeight: 800, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' },
-  title: { fontSize: 18, fontWeight: 700, color: '#FAFAFA', margin: '0 0 8px', letterSpacing: '-0.02em' },
-  message: { fontSize: 14, color: '#A1A1AA', margin: '0 0 24px', lineHeight: 1.5 },
+  title: { fontSize: 18, fontWeight: 700, color: 'var(--text-primary)', margin: '0 0 8px', letterSpacing: '-0.02em' },
+  message: { fontSize: 14, color: 'var(--text-muted)', margin: '0 0 24px', lineHeight: 1.5 },
   actions: { display: 'flex', gap: 12 },
-  cancelBtn: { flex: 1, padding: '12px 0', borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', backgroundColor: 'rgba(255,255,255,0.04)', cursor: 'pointer', fontSize: 14, fontWeight: 600, color: '#A1A1AA', transition: 'all 0.2s' },
+  cancelBtn: { flex: 1, padding: '12px 0', borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', backgroundColor: 'rgba(255,255,255,0.04)', cursor: 'pointer', fontSize: 14, fontWeight: 600, color: 'var(--text-muted)', transition: 'all 0.2s' },
   confirmBtn: { flex: 1, padding: '12px 0', borderRadius: 12, border: 'none', cursor: 'pointer', fontSize: 14, fontWeight: 700, color: '#FFF', transition: 'all 0.2s' },
 };

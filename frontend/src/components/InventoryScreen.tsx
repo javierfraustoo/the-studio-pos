@@ -72,7 +72,7 @@ export default function InventoryScreen() {
                   <span style={styles.batchTh}>Costo/u</span>
                 </div>
                 {activeBatches.map((b, i) => (
-                  <div key={b.id} style={{ ...styles.batchRow, backgroundColor: i === 0 ? 'rgba(245,158,11,0.08)' : '#18181B' }}>
+                  <div key={b.id} style={{ ...styles.batchRow, backgroundColor: i === 0 ? 'rgba(245,158,11,0.08)' : 'var(--bg-card)' }}>
                     <span style={styles.batchTd}>
                       {i === 0 && <span style={styles.fifoTag}>FIFO &#8594;</span>}
                       #{i + 1}
@@ -115,8 +115,8 @@ const styles: Record<string, React.CSSProperties> = {
   statusBadge: { padding: '2px 8px', borderRadius: 4, fontSize: 11, fontWeight: 700 },
   batchDetail: { padding: '0 16px 12px', marginLeft: 16, borderLeft: '3px solid #F59E0B' },
   batchHeader: { display: 'flex', padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.06)' },
-  batchTh: { flex: 1, fontSize: 10, fontWeight: 700, color: '#A1A1AA', textTransform: 'uppercase' as const },
+  batchTh: { flex: 1, fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' as const },
   batchRow: { display: 'flex', padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.04)' },
-  batchTd: { flex: 1, fontSize: 12, color: '#D4D4D8' },
+  batchTd: { flex: 1, fontSize: 12, color: 'var(--text-secondary)' },
   fifoTag: { fontSize: 10, fontWeight: 700, color: '#F59E0B', backgroundColor: 'rgba(245,158,11,0.12)', padding: '1px 5px', borderRadius: 3, marginRight: 4 },
 };
