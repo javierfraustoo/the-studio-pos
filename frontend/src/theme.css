@@ -16,9 +16,9 @@
   --bg-header: rgba(255,255,255,0.82);
 
   --text-primary: #1D1D1F;
-  --text-secondary: #3A3A3C;
-  --text-muted: #6E6E73;
-  --text-faint: #AEAEB2;
+  --text-secondary: #2C2C2E;
+  --text-muted: #48484A;
+  --text-faint: #8E8E93;
 
   --border: rgba(0,0,0,0.08);
   --border-light: rgba(0,0,0,0.04);
@@ -109,14 +109,39 @@ h1, h2, h3, h4 { letter-spacing: -0.025em; font-weight: 700; }
 input, select, textarea {
   background-color: var(--bg-input);
   color: var(--text-primary);
-  border-color: var(--border);
-  transition: background-color 0.2s, color 0.2s, border-color 0.2s;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 9px 12px;
+  font-size: 13px;
+  font-family: inherit;
+  outline: none;
+  transition: all 0.2s ease;
 }
 
-[data-theme="dark"] select { color-scheme: dark; }
+input:focus, select:focus, textarea:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+}
+
+/* Premium select styling */
+select {
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' stroke='%238E8E93' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 32px;
+  cursor: pointer;
+}
+
+[data-theme="dark"] select {
+  color-scheme: dark;
+  background-image: url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' stroke='%23A1A1AA' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
 
 input::placeholder, textarea::placeholder { color: var(--text-faint); }
 
+select option { padding: 8px 12px; }
 [data-theme="dark"] select option { background-color: #27272A; color: #FAFAFA; }
 [data-theme="dark"] select option:checked { background-color: #3F3F46; }
 

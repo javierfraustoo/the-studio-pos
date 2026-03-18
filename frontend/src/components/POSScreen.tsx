@@ -3,6 +3,8 @@ import { useStore } from '../store/useStore';
 import type { CartItemModifier } from '../store/useStore';
 import type { Product } from '../api';
 import ConfirmModal from './ConfirmModal';
+import OverrideModal from './OverrideModal';
+import { Percent } from 'lucide-react';
 
 // ─── Category Tabs ──────────────────────────────────────────────────────────
 
@@ -201,8 +203,14 @@ function CartPanel() {
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [lastOrder, setLastOrder] = useState<{ orderNumber: number; total: number; paymentMethod: string } | null>(null);
+  const [discountPercent, setDiscountPercent] = useState(0);
+  const [showDiscountInput, setShowDiscountInput] = useState(false);
+  const [showOverride, setShowOverride] = useState(false);
+  const [pendingDiscount, setPendingDiscount] = useState(0);
 
   const subtotal = cartSubtotal();
+  const discountAmount = subtotal * (discountPercent / 100);
+  const total = subtotal - discountAmount;
 
   const handlePay = async (method: string) => {
     setProcessing(true);
@@ -234,7 +242,13 @@ function CartPanel() {
           <button onClick={() => setShowCheckout(false)} style={{ fontSize: 13, color: 'var(--text-muted)', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>← Pedido</button>
         </div>
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24, gap: 16 }}>
-          <h2 style={{ fontSize: 44, fontWeight: 800, margin: 0, color: 'var(--text-primary)', letterSpacing: '-0.03em' }}>${subtotal.toFixed(2)}</h2>
+          <h2 style={{ fontSize: 44, fontWeight: 800, margin: 0, color: 'var(--text-primary)', letterSpacing: '-0.03em' }}>${total.toFixed(2)}</h2>
+          {discountPercent > 0 && (
+            <div style={{ textAlign: 'center' }}>
+              <span style={{ fontSize: 13, color: 'var(--text-faint)', textDecoration: 'line-through' }}>${subtotal.toFixed(2)}</span>
+              <span style={{ fontSize: 12, color: '#10B981', fontWeight: 600, marginLeft: 8 }}>-{discountPercent}%</span>
+            </div>
+          )}
           <p style={{ fontSize: 13, color: 'var(--text-faint)', margin: 0 }}>Total a cobrar</p>
           <button onClick={() => handlePay('cash')} disabled={processing}
             style={{ ...S.payBtn, background: 'linear-gradient(135deg, #059669, #10B981)' }}>
@@ -289,18 +303,63 @@ function CartPanel() {
       </div>
 
       {cart.length > 0 && (
-        <div style={{ padding: 16, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+        <div style={{ padding: 16, borderTop: '1px solid var(--border)' }}>
+          {/* Discount display */}
+          {discountPercent > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+              <span style={{ fontSize: 12, color: 'var(--text-faint)' }}>Subtotal</span>
+              <span style={{ fontSize: 12, color: 'var(--text-faint)', textDecoration: 'line-through' }}>${subtotal.toFixed(2)}</span>
+            </div>
+          )}
+          {discountPercent > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+              <span style={{ fontSize: 12, color: '#10B981', fontWeight: 600 }}>Descuento {discountPercent}%</span>
+              <span style={{ fontSize: 12, color: '#10B981', fontWeight: 600 }}>-${discountAmount.toFixed(2)}</span>
+            </div>
+          )}
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
             <span style={{ fontWeight: 600, fontSize: 14, color: 'var(--text-muted)' }}>Total</span>
-            <span style={{ fontWeight: 800, fontSize: 20, color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>${subtotal.toFixed(2)}</span>
+            <span style={{ fontWeight: 800, fontSize: 20, color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>${total.toFixed(2)}</span>
           </div>
-          <button onClick={() => setShowCheckout(true)} style={S.checkoutBtn}>Cobrar ${subtotal.toFixed(0)}</button>
+          <button onClick={() => setShowCheckout(true)} style={S.checkoutBtn}>Cobrar ${total.toFixed(0)}</button>
+
+          {/* Discount button */}
+          {!showDiscountInput ? (
+            <button onClick={() => setShowDiscountInput(true)}
+              style={{ width: '100%', marginTop: 8, padding: '9px 0', borderRadius: 10, border: '1px solid var(--border)', backgroundColor: 'transparent', color: 'var(--text-muted)', fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+              <Percent size={13} />
+              {discountPercent > 0 ? `Descuento: ${discountPercent}% (cambiar)` : 'Agregar descuento'}
+            </button>
+          ) : (
+            <div style={{ marginTop: 8, display: 'flex', gap: 6, alignItems: 'center' }}>
+              <input type="number" min="0" max="100" placeholder="%" value={pendingDiscount || ''}
+                onChange={e => setPendingDiscount(Math.min(100, Math.max(0, Number(e.target.value))))}
+                style={{ flex: 1, padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)', fontSize: 13, backgroundColor: 'var(--bg-input)', color: 'var(--text-primary)', outline: 'none', textAlign: 'center' }} />
+              <button onClick={() => { if (pendingDiscount > 0) { setShowOverride(true); } else { setDiscountPercent(0); setShowDiscountInput(false); } }}
+                style={{ padding: '8px 14px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg, #10B981, #059669)', color: '#FFF', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>
+                {pendingDiscount > 0 ? 'Autorizar' : 'Quitar'}
+              </button>
+              <button onClick={() => { setShowDiscountInput(false); setPendingDiscount(0); }}
+                style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)', backgroundColor: 'transparent', color: 'var(--text-faint)', fontSize: 12, cursor: 'pointer' }}>
+                ✕
+              </button>
+            </div>
+          )}
         </div>
       )}
 
       <ConfirmModal open={showClearConfirm} title="¿Limpiar pedido?" message={`Se eliminarán ${cart.length} productos del pedido.`}
         confirmLabel="Sí, limpiar" cancelLabel="Cancelar" danger
-        onConfirm={() => { clearCart(); setShowClearConfirm(false); }} onCancel={() => setShowClearConfirm(false)} />
+        onConfirm={() => { clearCart(); setDiscountPercent(0); setShowClearConfirm(false); }} onCancel={() => setShowClearConfirm(false)} />
+
+      <OverrideModal
+        isOpen={showOverride}
+        action="discount"
+        actionLabel={`Autorizar descuento del ${pendingDiscount}%`}
+        requestedBy="cajero"
+        onAuthorized={() => { setDiscountPercent(pendingDiscount); setShowDiscountInput(false); setShowOverride(false); }}
+        onCancel={() => setShowOverride(false)}
+      />
     </div>
   );
 }

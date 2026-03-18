@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { useStore } from './store/useStore';
 import type { TabId } from './store/useStore';
@@ -23,7 +23,7 @@ function DarkModeToggle() {
   const { darkMode, toggleDarkMode } = useStore();
   return (
     <button onClick={toggleDarkMode} title={darkMode ? 'Modo Claro' : 'Modo Oscuro'}
-      style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, borderRadius: 10, border: '1px solid rgba(255,255,255,0.08)', backgroundColor: 'rgba(255,255,255,0.04)', cursor: 'pointer', color: 'var(--text-muted)' }}>
+      style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, borderRadius: 10, border: '1px solid var(--border)', backgroundColor: 'var(--bg-hover)', cursor: 'pointer', color: 'var(--text-muted)' }}>
       {darkMode ? <Sun size={15} /> : <Moon size={15} />}
     </button>
   );
@@ -57,7 +57,7 @@ const TAB_DEFS: Array<{ id: TabId; label: string; Icon: React.FC<any> }> = [
 function MainApp() {
   const {
     activeTab, setActiveTab, showSimulators, toggleSimulators, orders, init, menuLoaded,
-    fetchOrders, fetchInventory, fetchAnalytics,
+    fetchOrders, fetchInventory, fetchAnalytics, inventory, kdsItems, wasteLogs,
     isAuthenticated, currentUser, logout, reloadMenu, darkMode,
   } = useStore();
 
@@ -73,6 +73,21 @@ function MainApp() {
     return () => { unsubscribe(channel); };
   }, []);
 
+  // Smart badge counts
+  const lowStockCount = useMemo(() => inventory.filter(i => i.stock <= i.minimumStock).length, [inventory]);
+  const kdsOverdueCount = useMemo(() => {
+    const now = Date.now();
+    return kdsItems.filter(i => i.status !== 'delivered' && (now - new Date(i.routed_at).getTime()) > 5 * 60 * 1000).length;
+  }, [kdsItems]);
+  const wasteCount = useMemo(() => wasteLogs.length, [wasteLogs]);
+
+  function getBadgeCount(tabId: TabId): number {
+    if (tabId === 'inventory' && lowStockCount > 0) return lowStockCount;
+    if (tabId === 'kds' && kdsOverdueCount > 0) return kdsOverdueCount;
+    if (tabId === 'waste' && wasteCount > 4) return wasteCount;
+    return 0;
+  }
+
   if (!isAuthenticated) return <LoginScreen />;
 
   if (currentUser && isKdsOnlyUser(currentUser)) {
@@ -80,11 +95,11 @@ function MainApp() {
     const title = currentUser.operator_type === 'barista' ? 'KDS Barra' : 'KDS Cocina';
     return (
       <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--bg-primary)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 20px', backgroundColor: 'rgba(24,24,27,0.85)', backdropFilter: 'blur(16px)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 20px', backgroundColor: 'var(--bg-header)', backdropFilter: 'blur(16px)', borderBottom: '1px solid var(--border)' }}>
           <span style={{ color: 'var(--text-primary)', fontSize: 14, fontWeight: 700, letterSpacing: '-0.01em' }}>{currentUser?.name} — {title}</span>
           <div style={{ display: 'flex', gap: 8 }}>
             <DarkModeToggle />
-            <button onClick={logout} style={{ padding: '6px 14px', borderRadius: 10, border: '1px solid rgba(239,68,68,0.3)', backgroundColor: 'transparent', color: '#EF4444', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Salir</button>
+            <button onClick={logout} style={{ padding: '6px 14px', borderRadius: 10, border: '1px solid var(--danger)', backgroundColor: 'transparent', color: 'var(--danger)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Salir</button>
           </div>
         </div>
         <div style={{ flex: 1 }}><KDSView station={station} title={title} /></div>
@@ -112,7 +127,6 @@ function MainApp() {
 
   return (
     <div style={S.app}>
-      {/* ─── Glassmorphism Header ─── */}
       <header style={S.header}>
         <div style={S.brand}>
           <div style={S.logoMark}>S</div>
@@ -122,17 +136,22 @@ function MainApp() {
         <nav style={S.nav}>
           {visibleTabs.map((t) => {
             const isActive = activeTab === t.id;
+            const badgeCount = getBadgeCount(t.id);
             return (
               <button key={t.id} onClick={() => setActiveTab(t.id)}
                 style={{
                   ...S.navBtn,
-                  backgroundColor: isActive ? 'rgba(16,185,129,0.12)' : 'transparent',
-                  color: isActive ? '#10B981' : '#71717A',
+                  backgroundColor: isActive ? 'var(--accent-glow)' : 'transparent',
+                  color: isActive ? 'var(--accent)' : 'var(--text-muted)',
                   borderColor: isActive ? 'rgba(16,185,129,0.2)' : 'transparent',
                 }}>
                 <t.Icon size={14} strokeWidth={isActive ? 2.5 : 2} />
                 <span>{t.label}</span>
-                {t.id === 'orders' && orders.length > 0 && <span style={S.badge}>{orders.length}</span>}
+                {badgeCount > 0 && (
+                  <span style={{ ...S.badge, backgroundColor: t.id === 'kds' ? '#F59E0B' : t.id === 'inventory' ? '#EF4444' : '#6366F1' }}>
+                    {badgeCount}
+                  </span>
+                )}
               </button>
             );
           })}
@@ -150,7 +169,6 @@ function MainApp() {
         </div>
       </header>
 
-      {/* ─── Main Content ─── */}
       <div style={S.mainArea}>
         <div style={{ flex: 1, overflow: 'hidden', display: 'flex' }}>
           {activeTab === 'pos' && <POSScreen />}
@@ -161,7 +179,7 @@ function MainApp() {
           {activeTab === 'analytics' && <AnalyticsScreen />}
           {activeTab === 'admin' && <AdminScreen />}
         </div>
-        {showHW && <div style={{ height: 280, borderTop: '1px solid rgba(255,255,255,0.06)', flexShrink: 0 }}><HardwareSimulators /></div>}
+        {showHW && <div style={{ height: 280, borderTop: '1px solid var(--border)', flexShrink: 0 }}><HardwareSimulators /></div>}
       </div>
     </div>
   );
@@ -183,11 +201,10 @@ export default function App() {
 const S: Record<string, React.CSSProperties> = {
   app: { height: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--bg-primary)', fontFamily: "'Inter', -apple-system, system-ui, sans-serif" },
 
-  // Header — Glassmorphism
   header: {
     display: 'flex', alignItems: 'center', padding: '0 20px', height: 56,
-    backgroundColor: 'rgba(9,9,11,0.82)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
-    borderBottom: '1px solid rgba(255,255,255,0.06)',
+    backgroundColor: 'var(--bg-header)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
+    borderBottom: '1px solid var(--border)',
     gap: 16, flexShrink: 0, position: 'sticky' as const, top: 0, zIndex: 50,
   },
 
@@ -209,15 +226,16 @@ const S: Record<string, React.CSSProperties> = {
     whiteSpace: 'nowrap' as const,
   },
   badge: {
-    fontSize: 10, fontWeight: 700, backgroundColor: '#EF4444', color: '#FFF',
-    padding: '1px 6px', borderRadius: 20, marginLeft: 2, lineHeight: '14px',
+    fontSize: 9, fontWeight: 700, color: '#FFF',
+    padding: '1px 5px', borderRadius: 20, marginLeft: 2, lineHeight: '13px',
+    minWidth: 16, textAlign: 'center' as const,
   },
 
   headerRight: { display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 },
   userPill: {
     display: 'flex', alignItems: 'center', gap: 8, padding: '4px 12px 4px 4px',
-    borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.04)',
-    border: '1px solid rgba(255,255,255,0.06)',
+    borderRadius: 20, backgroundColor: 'var(--bg-hover)',
+    border: '1px solid var(--border)',
   },
   userAvatar: {
     width: 26, height: 26, borderRadius: 13,
@@ -229,13 +247,13 @@ const S: Record<string, React.CSSProperties> = {
   userRole: { fontSize: 10, color: 'var(--text-faint)', fontWeight: 500 },
 
   iconBtn: {
-    width: 34, height: 34, borderRadius: 10, border: '1px solid rgba(255,255,255,0.08)',
-    backgroundColor: 'rgba(255,255,255,0.04)', cursor: 'pointer', color: 'var(--text-muted)',
+    width: 34, height: 34, borderRadius: 10, border: '1px solid var(--border)',
+    backgroundColor: 'var(--bg-hover)', cursor: 'pointer', color: 'var(--text-muted)',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
   },
   logoutBtn: {
-    width: 34, height: 34, borderRadius: 10, border: '1px solid rgba(239,68,68,0.2)',
-    backgroundColor: 'rgba(239,68,68,0.06)', cursor: 'pointer', color: '#EF4444',
+    width: 34, height: 34, borderRadius: 10, border: '1px solid var(--danger-bg)',
+    backgroundColor: 'var(--danger-bg)', cursor: 'pointer', color: 'var(--danger)',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
   },
 
