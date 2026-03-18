@@ -46,8 +46,8 @@ function OrderDetail({ order, onClose }: { order: Order; onClose: () => void }) 
         <div style={styles.modalFooter}>
           <span style={{
             ...styles.payBadge,
-            backgroundColor: order.payment_method === 'cash' ? '#D1FAE5' : '#DBEAFE',
-            color: order.payment_method === 'cash' ? '#065F46' : '#1E40AF',
+            backgroundColor: order.payment_method === 'cash' ? 'rgba(16,185,129,0.12)' : 'rgba(59,130,246,0.12)',
+            color: order.payment_method === 'cash' ? '#10B981' : '#3B82F6',
           }}>
             {order.payment_method === 'cash' ? 'Efectivo' : 'Tarjeta'}
           </span>
@@ -86,8 +86,8 @@ export default function OrdersScreen() {
                 <span style={styles.chipItems}>{o.items.length} item{o.items.length !== 1 ? 's' : ''}</span>
                 <span style={{
                   ...styles.chipTypeBadge,
-                  backgroundColor: o.order_type === 'to_go' ? '#FEF3C7' : '#DBEAFE',
-                  color: o.order_type === 'to_go' ? '#92400E' : '#1E40AF',
+                  backgroundColor: o.order_type === 'to_go' ? 'rgba(245,158,11,0.12)' : 'rgba(59,130,246,0.12)',
+                  color: o.order_type === 'to_go' ? '#F59E0B' : '#3B82F6',
                 }}>
                   {o.order_type === 'to_go' ? 'Llevar' : 'Mesa'}
                 </span>

@@ -1,185 +1,193 @@
-/* ─── Theme CSS Variables ─────────────────────────────────────────────────── */
+/* ═══════════════════════════════════════════════════════════════════════════
+   THE STUDIO POS — Premium Design System
+   Inspired by Apple + Miyagi Labs Finance Aesthetic
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+
 :root {
-  /* Light mode (default) */
-  --bg-primary: #F9FAFB;
-  --bg-secondary: #FFFFFF;
-  --bg-tertiary: #FAFAFA;
-  --bg-input: #FFFFFF;
-  --bg-hover: #F3F4F6;
-  --bg-card: #FFFFFF;
-  --bg-header: #FFFFFF;
-  --bg-kds: #111827;
+  /* ─── Premium Dark (Default & Only Theme) ─── */
+  --bg-primary: #09090B;
+  --bg-secondary: #18181B;
+  --bg-tertiary: #1C1C1F;
+  --bg-input: #27272A;
+  --bg-hover: #27272A;
+  --bg-card: #18181B;
+  --bg-header: rgba(9,9,11,0.82);
+  --bg-kds: #09090B;
 
-  --text-primary: #111827;
-  --text-secondary: #374151;
-  --text-muted: #6B7280;
-  --text-faint: #9CA3AF;
+  --text-primary: #FAFAFA;
+  --text-secondary: #D4D4D8;
+  --text-muted: #A1A1AA;
+  --text-faint: #52525B;
 
-  --border: #E5E7EB;
-  --border-light: #F3F4F6;
+  --border: rgba(255,255,255,0.06);
+  --border-light: rgba(255,255,255,0.03);
+  --border-hover: rgba(255,255,255,0.12);
 
-  --accent: #1F2937;
+  --accent: #10B981;
   --accent-text: #FFFFFF;
-
-  --danger: #DC2626;
-  --danger-bg: #FEE2E2;
-  --success: #059669;
-  --success-bg: #D1FAE5;
-  --warning: #D97706;
-  --warning-bg: #FEF3C7;
-  --info: #2563EB;
-  --info-bg: #DBEAFE;
-
-  --shadow: rgba(0,0,0,0.1);
-  --overlay: rgba(0,0,0,0.5);
-
-  /* KDS specific */
-  --kds-card-bg: #1E293B;
-  --kds-text: #F8FAFC;
-}
-
-/* Dark mode */
-[data-theme="dark"] {
-  --bg-primary: #0F172A;
-  --bg-secondary: #1E293B;
-  --bg-tertiary: #1E293B;
-  --bg-input: #334155;
-  --bg-hover: #334155;
-  --bg-card: #1E293B;
-  --bg-header: #0F172A;
-  --bg-kds: #0F172A;
-
-  --text-primary: #F1F5F9;
-  --text-secondary: #CBD5E1;
-  --text-muted: #94A3B8;
-  --text-faint: #64748B;
-
-  --border: #334155;
-  --border-light: #1E293B;
-
-  --accent: #3B82F6;
-  --accent-text: #FFFFFF;
+  --accent-glow: rgba(16,185,129,0.15);
+  --accent-hover: #059669;
 
   --danger: #EF4444;
-  --danger-bg: #451A1A;
+  --danger-bg: rgba(239,68,68,0.12);
   --success: #10B981;
-  --success-bg: #14332A;
+  --success-bg: rgba(16,185,129,0.12);
   --warning: #F59E0B;
-  --warning-bg: #422006;
+  --warning-bg: rgba(245,158,11,0.12);
   --info: #3B82F6;
-  --info-bg: #1E3A5F;
+  --info-bg: rgba(59,130,246,0.12);
 
-  --shadow: rgba(0,0,0,0.4);
-  --overlay: rgba(0,0,0,0.7);
+  --shadow: rgba(0,0,0,0.5);
+  --overlay: rgba(0,0,0,0.75);
 
-  --kds-card-bg: #334155;
-  --kds-text: #F8FAFC;
+  --kds-card-bg: #18181B;
+  --kds-text: #FAFAFA;
+
+  /* Radius */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --radius-2xl: 24px;
 }
 
-/* Global body styles tied to theme */
+/* Keep data-theme="dark" for backwards compatibility */
+[data-theme="dark"] {
+  /* All same as :root — single premium dark theme */
+}
+
+/* ─── Global Resets ───────────────────────────────────────────────────── */
+
+* {
+  box-sizing: border-box;
+}
+
 body {
   margin: 0;
   padding: 0;
   background-color: var(--bg-primary);
   color: var(--text-primary);
-  transition: background-color 0.2s ease, color 0.2s ease;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
 }
 
-/* Smooth theme transitions */
-*, *::before, *::after {
-  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.1s ease;
+/* ─── Typography ──────────────────────────────────────────────────────── */
+
+h1, h2, h3, h4 {
+  letter-spacing: -0.025em;
+  font-weight: 700;
 }
 
-/* Override for inputs in dark mode */
-[data-theme="dark"] input,
-[data-theme="dark"] select,
-[data-theme="dark"] textarea {
+/* Tabular nums for prices, quantities, timers */
+.tabular-nums,
+[style*="fontFamily: 'monospace'"],
+[style*="monospace"] {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ─── Form Elements ───────────────────────────────────────────────────── */
+
+input, select, textarea {
   background-color: var(--bg-input);
   color: var(--text-primary);
   border-color: var(--border);
-}
-
-[data-theme="dark"] input::placeholder,
-[data-theme="dark"] textarea::placeholder {
-  color: var(--text-faint);
-}
-
-/* Fix dropdown options in dark mode (native <option> elements) */
-[data-theme="dark"] select option {
-  background-color: #1E293B;
-  color: #F1F5F9;
-}
-
-[data-theme="dark"] select option:checked {
-  background-color: #334155;
-}
-
-/* Ensure select arrows are visible in dark mode */
-[data-theme="dark"] select {
   color-scheme: dark;
 }
 
-/* Scrollbar in dark mode */
-[data-theme="dark"] ::-webkit-scrollbar {
-  width: 8px;
-}
-[data-theme="dark"] ::-webkit-scrollbar-track {
-  background: var(--bg-primary);
-}
-[data-theme="dark"] ::-webkit-scrollbar-thumb {
-  background: var(--border);
-  border-radius: 4px;
+input::placeholder,
+textarea::placeholder {
+  color: var(--text-faint);
 }
 
-/* ─── Global Hover Micro-interactions ──────────────────────────────────── */
-
-/* Nav buttons hover glow */
-nav button:hover {
-  filter: brightness(1.1);
-  transform: translateY(-1px);
+select option {
+  background-color: #27272A;
+  color: #FAFAFA;
 }
 
-/* Product cards hover lift */
-button[style*="productCard"]:hover,
-details summary:hover {
-  box-shadow: 0 4px 12px var(--shadow);
+select option:checked {
+  background-color: #3F3F46;
 }
 
-/* Table rows hover highlight */
+/* ─── Scrollbars (Minimal) ────────────────────────────────────────────── */
+
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.08);
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255,255,255,0.15);
+}
+
+/* ─── Micro-interactions ──────────────────────────────────────────────── */
+
+button {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+}
+
+button:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+/* Nav buttons */
+nav button:hover:not(:disabled) {
+  background-color: rgba(255,255,255,0.06) !important;
+}
+
+/* Product card hover */
+button[data-product]:hover {
+  transform: scale(1.02);
+  border-color: var(--border-hover) !important;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+}
+
+/* Table row hover */
 details summary:hover {
   background-color: var(--bg-hover) !important;
 }
 
-/* Generic button hover feedback */
-button {
-  transition: all 0.15s ease;
-}
-button:hover:not(:disabled) {
-  filter: brightness(1.08);
-}
-button:active:not(:disabled) {
-  transform: scale(0.98);
+/* Focus visible for accessibility */
+button:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
-/* Card hover effects */
-[data-theme="light"] button:hover {
-  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
-}
-[data-theme="dark"] button:hover {
-  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+/* ─── Selection Color ─────────────────────────────────────────────────── */
+
+::selection {
+  background-color: rgba(16,185,129,0.3);
+  color: #FFFFFF;
 }
 
-/* Scrollbar for both modes */
-::-webkit-scrollbar {
-  width: 6px;
+/* ─── Animations ──────────────────────────────────────────────────────── */
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: scale(0.98); }
+  to { opacity: 1; transform: scale(1); }
 }
-::-webkit-scrollbar-track {
-  background: transparent;
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
 }
-::-webkit-scrollbar-thumb {
-  background: var(--border);
-  border-radius: 3px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: var(--text-faint);
+
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(16,185,129,0); }
+  50% { box-shadow: 0 0 20px 4px rgba(16,185,129,0.15); }
 }

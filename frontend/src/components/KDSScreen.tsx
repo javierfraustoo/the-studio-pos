@@ -4,60 +4,41 @@ import * as api from '../api';
 import type { KdsItem } from '../api';
 
 function getSlaColor(minutes: number) {
-  if (minutes >= 10) return { bg: '#FEE2E2', border: '#EF4444', label: 'URGENTE' };
-  if (minutes >= 5) return { bg: '#FEF3C7', border: '#F59E0B', label: 'ATENCION' };
-  return { bg: '#D1FAE5', border: '#10B981', label: '' };
+  if (minutes >= 10) return { bg: 'rgba(239,68,68,0.08)', border: 'rgba(239,68,68,0.4)', text: '#EF4444', label: 'URGENTE' };
+  if (minutes >= 5) return { bg: 'rgba(245,158,11,0.08)', border: 'rgba(245,158,11,0.4)', text: '#F59E0B', label: 'ATENCIÓN' };
+  return { bg: 'rgba(16,185,129,0.06)', border: 'rgba(16,185,129,0.25)', text: '#10B981', label: '' };
 }
 
 function useTimer() {
   const [now, setNow] = useState(Date.now());
-  useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(id);
-  }, []);
+  useEffect(() => { const id = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(id); }, []);
   return now;
 }
 
 function formatElapsed(ms: number): string {
   const totalSec = Math.max(0, Math.floor(ms / 1000));
-  const mins = Math.floor(totalSec / 60);
-  const secs = totalSec % 60;
-  return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+  const m = Math.floor(totalSec / 60), s = totalSec % 60;
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
-
-// ─── Undo Toast ─────────────────────────────────────────────────────────────
 
 interface UndoAction { itemId: string; previousStatus: string; itemName: string; }
 
 function UndoToast({ action, onUndo, onDismiss }: { action: UndoAction; onUndo: () => void; onDismiss: () => void }) {
   const [timeLeft, setTimeLeft] = useState(5);
-  useEffect(() => {
-    if (timeLeft <= 0) { onDismiss(); return; }
-    const t = setTimeout(() => setTimeLeft(timeLeft - 1), 1000);
-    return () => clearTimeout(t);
-  }, [timeLeft]);
-
+  useEffect(() => { if (timeLeft <= 0) { onDismiss(); return; } const t = setTimeout(() => setTimeLeft(timeLeft - 1), 1000); return () => clearTimeout(t); }, [timeLeft]);
   return (
-    <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', zIndex: 300 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 18px', backgroundColor: '#1F2937', borderRadius: 10, boxShadow: '0 8px 30px rgba(0,0,0,0.3)' }}>
-        <span style={{ color: '#FFF', fontSize: 13, fontWeight: 500 }}>"{action.itemName}" marcado</span>
-        <button onClick={onUndo} style={{ padding: '5px 14px', borderRadius: 6, border: '2px solid #FCD34D', backgroundColor: 'transparent', color: '#FCD34D', fontWeight: 800, fontSize: 12, cursor: 'pointer' }}>DESHACER ({timeLeft}s)</button>
-        <button onClick={onDismiss} style={{ background: 'none', border: 'none', color: '#9CA3AF', cursor: 'pointer', fontSize: 14 }}>✕</button>
+    <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', zIndex: 300, animation: 'slideUp 0.3s ease-out' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 18px', backgroundColor: '#27272A', borderRadius: 14, boxShadow: '0 12px 40px rgba(0,0,0,0.5)', border: '1px solid rgba(255,255,255,0.08)' }}>
+        <span style={{ color: '#FAFAFA', fontSize: 13, fontWeight: 500 }}>"{action.itemName}" marcado</span>
+        <button onClick={onUndo} style={{ padding: '5px 14px', borderRadius: 8, border: '1.5px solid rgba(16,185,129,0.4)', backgroundColor: 'transparent', color: '#10B981', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>DESHACER ({timeLeft}s)</button>
+        <button onClick={onDismiss} style={{ background: 'none', border: 'none', color: '#52525B', cursor: 'pointer', fontSize: 14 }}>✕</button>
       </div>
     </div>
   );
 }
 
-// ─── KDS Item Card ──────────────────────────────────────────────────────────
-
-function KdsItemCard({
-  item, now, onMarkReady, onMarkDelivered, userRole, operatorType,
-}: {
-  item: KdsItem; now: number;
-  onMarkReady: (id: string) => void;
-  onMarkDelivered: (id: string) => void;
-  userRole: string;
-  operatorType: string;
+function KdsItemCard({ item, now, onMarkReady, onMarkDelivered, userRole, operatorType }: {
+  item: KdsItem; now: number; onMarkReady: (id: string) => void; onMarkDelivered: (id: string) => void; userRole: string; operatorType: string;
 }) {
   const elapsed = now - new Date(item.routed_at).getTime();
   const mins = Math.floor(elapsed / 60000);
@@ -66,61 +47,54 @@ function KdsItemCard({
 
   return (
     <div style={{
-      ...styles.kdsCard,
-      backgroundColor: isReady ? '#EFF6FF' : sla.bg,
-      borderColor: isReady ? '#3B82F6' : sla.border,
+      borderRadius: 16, border: `2px solid ${isReady ? 'rgba(59,130,246,0.3)' : sla.border}`,
+      backgroundColor: isReady ? 'rgba(59,130,246,0.06)' : sla.bg,
+      padding: 14, display: 'flex', flexDirection: 'column' as const, gap: 6,
+      transition: 'all 0.3s ease',
     }}>
-      <div style={styles.kdsCardHeader}>
-        <div style={styles.kdsOrderInfo}>
-          <span style={styles.kdsOrderNum}>#{item.order_number}</span>
-          <span style={styles.kdsOrderType}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ fontSize: 18, fontWeight: 800, color: '#FAFAFA' }}>#{item.order_number}</span>
+          <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 6, backgroundColor: 'rgba(255,255,255,0.06)', color: '#A1A1AA' }}>
             {item.order_type === 'to_go' ? 'LLEVAR' : 'MESA'}
           </span>
         </div>
-        <div style={{ ...styles.kdsTimer, color: isReady ? '#3B82F6' : sla.border }}>
+        <span style={{ fontSize: 24, fontWeight: 800, fontFamily: 'monospace', fontVariantNumeric: 'tabular-nums' as const, color: isReady ? '#3B82F6' : sla.text }}>
           {isReady ? 'LISTO' : formatElapsed(elapsed)}
-        </div>
+        </span>
       </div>
 
-      {item.customer_name && <p style={styles.kdsCustomer}>{item.customer_name}</p>}
+      {item.customer_name && <p style={{ fontSize: 12, fontWeight: 600, color: '#A1A1AA', margin: 0 }}>{item.customer_name}</p>}
+      {!isReady && sla.label && <div style={{ alignSelf: 'flex-start', fontSize: 10, fontWeight: 800, padding: '2px 8px', borderRadius: 6, backgroundColor: sla.text, color: '#FFF', letterSpacing: '0.05em' }}>{sla.label}</div>}
 
-      {!isReady && sla.label && (
-        <div style={{ ...styles.slaBadge, backgroundColor: sla.border }}>{sla.label}</div>
-      )}
-
-      <div style={styles.kdsProduct}>
-        <span style={styles.kdsQty}>{item.quantity}x</span>
-        <span style={styles.kdsName}>{item.product_name}</span>
+      <div style={{ display: 'flex', gap: 6, alignItems: 'baseline' }}>
+        <span style={{ fontSize: 18, fontWeight: 800, color: '#FAFAFA' }}>{item.quantity}x</span>
+        <span style={{ fontSize: 16, fontWeight: 700, color: '#D4D4D8' }}>{item.product_name}</span>
       </div>
 
       {item.modifiers.length > 0 && (
-        <div style={styles.kdsModifiers}>
-          {item.modifiers.map((m, i) => (
-            <span key={i} style={styles.kdsModTag}>{m}</span>
-          ))}
+        <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: 4 }}>
+          {item.modifiers.map((m, i) => <span key={i} style={{ fontSize: 11, backgroundColor: 'rgba(255,255,255,0.06)', padding: '2px 7px', borderRadius: 6, fontWeight: 600, color: '#A1A1AA' }}>{m}</span>)}
         </div>
       )}
 
-      {item.notes && <p style={styles.kdsNotes}>{item.notes}</p>}
+      {item.notes && <p style={{ fontSize: 12, color: '#F59E0B', fontStyle: 'italic', fontWeight: 600, margin: 0, padding: '3px 8px', backgroundColor: 'rgba(245,158,11,0.08)', borderRadius: 6 }}>{item.notes}</p>}
 
-      {/* Cajero: ONLY "Entregado" (when item is ready). Barista/Cocina/Admin/Supervisor: both buttons */}
       {item.status !== 'ready' && !(userRole === 'operador' && operatorType === 'cajero') && (
         <button onClick={() => onMarkReady(item.id)}
-          style={{ ...styles.kdsActionBtn, backgroundColor: '#059669' }}>
+          style={{ width: '100%', padding: '10px 0', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg, #059669, #10B981)', color: '#FFF', fontSize: 14, fontWeight: 800, cursor: 'pointer', letterSpacing: '0.03em', marginTop: 4 }}>
           LISTO
         </button>
       )}
       {item.status === 'ready' && (
         <button onClick={() => onMarkDelivered(item.id)}
-          style={{ ...styles.kdsActionBtn, backgroundColor: '#3B82F6' }}>
+          style={{ width: '100%', padding: '10px 0', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg, #2563EB, #3B82F6)', color: '#FFF', fontSize: 14, fontWeight: 800, cursor: 'pointer', letterSpacing: '0.03em', marginTop: 4 }}>
           ENTREGADO
         </button>
       )}
     </div>
   );
 }
-
-// ─── Main KDS Screen ────────────────────────────────────────────────────────
 
 export default function KDSScreen() {
   const { kdsItems, fetchKdsItems, currentUser } = useStore();
@@ -131,142 +105,86 @@ export default function KDSScreen() {
   const [showHistory, setShowHistory] = useState(false);
   const [historyItems, setHistoryItems] = useState<KdsItem[]>([]);
   const [undoAction, setUndoAction] = useState<UndoAction | null>(null);
-
-  // Stable ref for station to avoid loops
   const stationRef = useRef(activeStation);
   stationRef.current = activeStation;
 
-  // Fetch on station change ONLY
-  useEffect(() => {
-    fetchKdsItems(activeStation);
-  }, [activeStation]); // eslint-disable-line
+  useEffect(() => { fetchKdsItems(activeStation); }, [activeStation]);
 
-  const loadHistory = useCallback(async () => {
-    const items = await api.fetchKdsHistory(activeStation);
-    setHistoryItems(items);
-  }, [activeStation]);
+  const loadHistory = useCallback(async () => { setHistoryItems(await api.fetchKdsHistory(activeStation)); }, [activeStation]);
 
-  const stationItems = kdsItems
-    .filter((i) => i.station === activeStation && i.status !== 'delivered')
+  const stationItems = kdsItems.filter((i) => i.station === activeStation && i.status !== 'delivered')
     .sort((a, b) => new Date(a.routed_at).getTime() - new Date(b.routed_at).getTime());
 
-  // Optimistic mark ready
   const handleMarkReady = useCallback(async (id: string) => {
     const item = kdsItems.find(k => k.id === id);
     if (!item) return;
-
-    // Optimistic update in store
     useStore.getState().updateKdsItemLocal({ ...item, status: 'ready', ready_at: new Date().toISOString() });
     setUndoAction({ itemId: id, previousStatus: item.status, itemName: item.product_name });
-
-    try {
-      await api.updateKdsItem(id, 'ready');
-    } catch {
-      // Revert
-      useStore.getState().updateKdsItemLocal(item);
-      setUndoAction(null);
-    }
+    try { await api.updateKdsItem(id, 'ready'); } catch { useStore.getState().updateKdsItemLocal(item); setUndoAction(null); }
   }, [kdsItems]);
 
-  // Optimistic mark delivered
   const handleMarkDelivered = useCallback(async (id: string) => {
     const item = kdsItems.find(k => k.id === id);
     if (!item) return;
-
-    // Optimistic: mark as delivered (will be filtered out by stationItems)
     useStore.getState().updateKdsItemLocal({ ...item, status: 'delivered' });
     setUndoAction({ itemId: id, previousStatus: item.status, itemName: item.product_name });
-
-    try {
-      await api.updateKdsItem(id, 'delivered');
-    } catch {
-      // Revert
-      useStore.getState().updateKdsItemLocal(item);
-      setUndoAction(null);
-    }
+    try { await api.updateKdsItem(id, 'delivered'); } catch { useStore.getState().updateKdsItemLocal(item); setUndoAction(null); }
   }, [kdsItems]);
 
-  // Undo
   const handleUndo = useCallback(async () => {
     if (!undoAction) return;
     setUndoAction(null);
-    try {
-      const result = await api.updateKdsItem(undoAction.itemId, undoAction.previousStatus);
-      // Socket will handle state sync
-    } catch (e) {
-      console.error('Undo failed:', e);
-    }
+    try { await api.updateKdsItem(undoAction.itemId, undoAction.previousStatus); } catch (e) { console.error('Undo failed:', e); }
   }, [undoAction]);
 
   const pendingCount = stationItems.filter((i) => i.status !== 'ready').length;
   const readyCount = stationItems.filter((i) => i.status === 'ready').length;
 
   return (
-    <div style={styles.kdsContainer}>
-      <div style={styles.kdsTabBar}>
-        <button onClick={() => { setActiveStation('bar'); setShowHistory(false); }}
-          style={{ ...styles.kdsTab, backgroundColor: activeStation === 'bar' ? '#78350F' : '#F3F4F6', color: activeStation === 'bar' ? '#FFF' : '#374151' }}>
-          KDS Barra
-          {activeStation === 'bar' && pendingCount > 0 && <span style={styles.kdsBadge}>{pendingCount}</span>}
-        </button>
-        <button onClick={() => { setActiveStation('kitchen'); setShowHistory(false); }}
-          style={{ ...styles.kdsTab, backgroundColor: activeStation === 'kitchen' ? '#065F46' : '#F3F4F6', color: activeStation === 'kitchen' ? '#FFF' : '#374151' }}>
-          KDS Cocina
-          {activeStation === 'kitchen' && pendingCount > 0 && <span style={styles.kdsBadge}>{pendingCount}</span>}
-        </button>
-
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', padding: 20, overflowY: 'auto', backgroundColor: '#09090B' }}>
+      <div style={{ display: 'flex', gap: 6, marginBottom: 14, alignItems: 'center', flexWrap: 'wrap' as const }}>
+        {(['bar', 'kitchen'] as const).map((st) => {
+          const isActive = activeStation === st;
+          const color = st === 'bar' ? '#B45309' : '#059669';
+          return (
+            <button key={st} onClick={() => { setActiveStation(st); setShowHistory(false); }}
+              style={{
+                padding: '8px 18px', borderRadius: 12, border: `1px solid ${isActive ? color : 'rgba(255,255,255,0.06)'}`,
+                cursor: 'pointer', fontWeight: 700, fontSize: 13, display: 'flex', alignItems: 'center', gap: 8,
+                backgroundColor: isActive ? `${color}18` : 'transparent', color: isActive ? color : '#71717A',
+              }}>
+              KDS {st === 'bar' ? 'Barra' : 'Cocina'}
+              {isActive && pendingCount > 0 && <span style={{ backgroundColor: '#EF4444', color: '#FFF', fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 10 }}>{pendingCount}</span>}
+            </button>
+          );
+        })}
         <button onClick={() => { setShowHistory(!showHistory); if (!showHistory) loadHistory(); }}
-          style={{ ...styles.kdsTab, backgroundColor: showHistory ? '#374151' : '#F3F4F6', color: showHistory ? '#FFF' : '#374151' }}>
+          style={{ padding: '8px 18px', borderRadius: 12, border: `1px solid ${showHistory ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.06)'}`, cursor: 'pointer', fontWeight: 600, fontSize: 13, backgroundColor: showHistory ? 'rgba(255,255,255,0.06)' : 'transparent', color: showHistory ? '#D4D4D8' : '#52525B' }}>
           {showHistory ? 'Pendientes' : 'Historial'}
         </button>
-
-        <div style={styles.kdsStats}>
-          <span style={styles.kdsStat}>
-            <span style={{ ...styles.kdsStatDot, backgroundColor: '#F59E0B' }} /> Pendientes: {pendingCount}
-          </span>
-          <span style={styles.kdsStat}>
-            <span style={{ ...styles.kdsStatDot, backgroundColor: '#3B82F6' }} /> Listos: {readyCount}
-          </span>
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: 14 }}>
+          <span style={{ fontSize: 12, color: '#71717A', display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#F59E0B' }} /> {pendingCount} pend.</span>
+          <span style={{ fontSize: 12, color: '#71717A', display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#3B82F6' }} /> {readyCount} listos</span>
         </div>
-      </div>
-
-      <div style={styles.slaLegend}>
-        <span style={styles.slaItem}><span style={{ ...styles.slaBox, backgroundColor: '#D1FAE5', borderColor: '#10B981' }} /> {'< 5 min'}</span>
-        <span style={styles.slaItem}><span style={{ ...styles.slaBox, backgroundColor: '#FEF3C7', borderColor: '#F59E0B' }} /> {'5-10 min'}</span>
-        <span style={styles.slaItem}><span style={{ ...styles.slaBox, backgroundColor: '#FEE2E2', borderColor: '#EF4444' }} /> {'> 10 min'}</span>
       </div>
 
       {showHistory ? (
         <div style={{ flex: 1, overflowY: 'auto' }}>
-          <h4 style={{ margin: '0 0 12px', color: '#6B7280', fontSize: 13, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1 }}>
-            Entregados Hoy ({historyItems.length})
-          </h4>
-          {historyItems.length === 0 ? (
-            <div style={styles.kdsEmpty}>
-              <p>Sin pedidos entregados hoy</p>
-            </div>
-          ) : (
-            <div style={styles.kdsGrid}>
+          <h4 style={{ margin: '0 0 12px', color: '#52525B', fontSize: 12, fontWeight: 600, textTransform: 'uppercase' as const, letterSpacing: '0.08em' }}>Entregados Hoy ({historyItems.length})</h4>
+          {historyItems.length === 0 ? <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#3F3F46' }}>Sin entregas hoy</div> : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 8 }}>
               {historyItems.map(item => {
-                const delivered = item.delivered_at ? new Date(item.delivered_at) : null;
-                const routed = new Date(item.routed_at);
-                const prepMins = delivered ? Math.floor((delivered.getTime() - routed.getTime()) / 60000) : 0;
+                const d = item.delivered_at ? new Date(item.delivered_at) : null;
+                const r = new Date(item.routed_at);
+                const pm = d ? Math.floor((d.getTime() - r.getTime()) / 60000) : 0;
                 return (
-                  <div key={item.id} style={{ ...styles.kdsCard, backgroundColor: '#F9FAFB', borderColor: '#D1D5DB', opacity: 0.8 }}>
-                    <div style={styles.kdsCardHeader}>
-                      <div style={styles.kdsOrderInfo}>
-                        <span style={{ ...styles.kdsOrderNum, fontSize: 16 }}>#{item.order_number}</span>
-                        <span style={styles.kdsOrderType}>{item.order_type === 'to_go' ? 'LLEVAR' : 'MESA'}</span>
-                      </div>
-                      <span style={{ fontSize: 12, color: '#6B7280', fontWeight: 600 }}>{prepMins} min</span>
+                  <div key={item.id} style={{ borderRadius: 12, border: '1px solid rgba(255,255,255,0.04)', backgroundColor: 'rgba(255,255,255,0.02)', padding: 12, opacity: 0.7 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ fontSize: 14, fontWeight: 700, color: '#A1A1AA' }}>#{item.order_number}</span>
+                      <span style={{ fontSize: 11, color: '#52525B', fontWeight: 600 }}>{pm} min</span>
                     </div>
-                    <div style={styles.kdsProduct}>
-                      <span style={{ ...styles.kdsQty, fontSize: 14, color: '#6B7280' }}>{item.quantity}x</span>
-                      <span style={{ ...styles.kdsName, fontSize: 14, color: '#6B7280' }}>{item.product_name}</span>
-                    </div>
-                    <div style={{ fontSize: 11, color: '#9CA3AF' }}>
-                      {delivered?.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}
-                    </div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: '#71717A', marginTop: 4 }}>{item.quantity}x {item.product_name}</div>
+                    <div style={{ fontSize: 10, color: '#3F3F46', marginTop: 4 }}>{d?.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}</div>
                   </div>
                 );
               })}
@@ -274,12 +192,12 @@ export default function KDSScreen() {
           )}
         </div>
       ) : stationItems.length === 0 ? (
-        <div style={styles.kdsEmpty}>
-          <span style={styles.kdsEmptyIcon}>{activeStation === 'bar' ? '\u2615' : '\u{1F373}'}</span>
-          <p>Sin órdenes pendientes en {activeStation === 'bar' ? 'barra' : 'cocina'}</p>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+          <span style={{ fontSize: 40, marginBottom: 12, opacity: 0.3 }}>{activeStation === 'bar' ? '☕' : '🍳'}</span>
+          <p style={{ color: '#3F3F46', fontSize: 14 }}>Sin órdenes pendientes en {activeStation === 'bar' ? 'barra' : 'cocina'}</p>
         </div>
       ) : (
-        <div style={styles.kdsGrid}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 10, flex: 1, alignContent: 'start' }}>
           {stationItems.map((item) => (
             <KdsItemCard key={item.id} item={item} now={now} userRole={userRole} operatorType={operatorType}
               onMarkReady={handleMarkReady} onMarkDelivered={handleMarkDelivered} />
@@ -287,40 +205,7 @@ export default function KDSScreen() {
         </div>
       )}
 
-      {undoAction && (
-        <UndoToast action={undoAction} onUndo={handleUndo} onDismiss={() => setUndoAction(null)} />
-      )}
+      {undoAction && <UndoToast action={undoAction} onUndo={handleUndo} onDismiss={() => setUndoAction(null)} />}
     </div>
   );
 }
-
-const styles: Record<string, React.CSSProperties> = {
-  kdsContainer: { height: '100%', display: 'flex', flexDirection: 'column', padding: 20, overflowY: 'auto' },
-  kdsTabBar: { display: 'flex', gap: 8, marginBottom: 12, alignItems: 'center', flexWrap: 'wrap' },
-  kdsTab: { padding: '10px 20px', borderRadius: 10, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 14, display: 'flex', alignItems: 'center', gap: 8, transition: 'all 0.15s' },
-  kdsBadge: { backgroundColor: '#EF4444', color: '#FFF', fontSize: 11, fontWeight: 700, padding: '2px 7px', borderRadius: 10 },
-  kdsStats: { marginLeft: 'auto', display: 'flex', gap: 16 },
-  kdsStat: { fontSize: 13, color: '#6B7280', display: 'flex', alignItems: 'center', gap: 4, fontWeight: 500 },
-  kdsStatDot: { width: 8, height: 8, borderRadius: 4 },
-  slaLegend: { display: 'flex', gap: 16, marginBottom: 16, padding: '8px 12px', backgroundColor: '#F9FAFB', borderRadius: 8 },
-  slaItem: { display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#6B7280' },
-  slaBox: { width: 16, height: 16, borderRadius: 4, border: '2px solid' },
-  kdsGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 10, flex: 1 },
-  kdsCard: { borderRadius: 12, border: '3px solid', padding: 12, display: 'flex', flexDirection: 'column', gap: 4, transition: 'all 0.2s ease' },
-  kdsCardHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
-  kdsOrderInfo: { display: 'flex', alignItems: 'center', gap: 6 },
-  kdsOrderNum: { fontSize: 18, fontWeight: 800, color: '#111827' },
-  kdsOrderType: { fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 4, backgroundColor: '#E5E7EB', color: '#374151' },
-  kdsTimer: { fontSize: 22, fontWeight: 800, fontFamily: 'monospace' },
-  kdsCustomer: { fontSize: 12, fontWeight: 600, color: '#374151', margin: 0 },
-  slaBadge: { alignSelf: 'flex-start', color: '#FFF', fontSize: 10, fontWeight: 800, padding: '2px 8px', borderRadius: 4, letterSpacing: 1 },
-  kdsProduct: { display: 'flex', gap: 6, alignItems: 'baseline' },
-  kdsQty: { fontSize: 16, fontWeight: 800, color: '#1F2937' },
-  kdsName: { fontSize: 15, fontWeight: 700, color: '#1F2937' },
-  kdsModifiers: { display: 'flex', flexWrap: 'wrap', gap: 3 },
-  kdsModTag: { fontSize: 11, backgroundColor: 'rgba(0,0,0,0.08)', padding: '2px 6px', borderRadius: 4, fontWeight: 600, color: '#374151' },
-  kdsNotes: { fontSize: 12, color: '#D97706', fontStyle: 'italic', fontWeight: 600, margin: 0, padding: '3px 6px', backgroundColor: '#FFFBEB', borderRadius: 4 },
-  kdsActionBtn: { width: '100%', padding: '10px 0', borderRadius: 8, border: 'none', color: '#FFF', fontSize: 14, fontWeight: 800, cursor: 'pointer', letterSpacing: 1, marginTop: 2, transition: 'opacity 0.2s' },
-  kdsEmpty: { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#9CA3AF' },
-  kdsEmptyIcon: { fontSize: 48, marginBottom: 12 },
-};

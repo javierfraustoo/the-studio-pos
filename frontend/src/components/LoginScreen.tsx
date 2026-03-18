@@ -52,9 +52,9 @@ export default function LoginScreen() {
     if (u.role === 'admin') return '#7C3AED';
     if (u.role === 'supervisor') return '#D97706';
     if (u.operator_type === 'cajero') return '#2563EB';
-    if (u.operator_type === 'barista') return '#78350F';
-    if (u.operator_type === 'cocina') return '#065F46';
-    return '#6B7280';
+    if (u.operator_type === 'barista') return '#D97706';
+    if (u.operator_type === 'cocina') return '#10B981';
+    return '#A1A1AA';
   };
 
   // User Selection
@@ -63,7 +63,7 @@ export default function LoginScreen() {
       <div style={styles.page}>
         <div style={styles.container}>
           <div style={styles.logo}>
-            <span style={{ fontSize: 28, color: '#78350F' }}>&#9670;</span>
+            <span style={{ fontSize: 28, color: '#10B981' }}>&#9670;</span>
             <h1 style={styles.title}>THE STUDIO</h1>
             <span style={styles.badge}>POS</span>
           </div>
@@ -97,7 +97,7 @@ export default function LoginScreen() {
 
         <div style={styles.pinDots}>
           {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} style={{ ...styles.dot, backgroundColor: i < pin.length ? '#1F2937' : '#E5E7EB' }} />
+            <div key={i} style={{ ...styles.dot, backgroundColor: i < pin.length ? '#10B981' : '#3F3F46' }} />
           ))}
         </div>
 
@@ -108,7 +108,7 @@ export default function LoginScreen() {
           {['1','2','3','4','5','6','7','8','9','','0','del'].map((key, i) => (
             key === '' ? <div key={i} /> :
             key === 'del' ? (
-              <button key={i} onClick={handleDelete} style={{ ...styles.numKey, backgroundColor: '#FEE2E2', color: '#DC2626' }}>
+              <button key={i} onClick={handleDelete} style={{ ...styles.numKey, backgroundColor: 'rgba(239,68,68,0.12)', color: '#EF4444' }}>
                 &#9003;
               </button>
             ) : (
@@ -124,23 +124,23 @@ export default function LoginScreen() {
 }
 
 const styles: Record<string, React.CSSProperties> = {
-  page: { height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#F9FAFB', fontFamily: "'Inter', system-ui, sans-serif" },
+  page: { height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#09090B', fontFamily: "'Inter', system-ui, sans-serif" },
   container: { width: '100%', maxWidth: 420, padding: 32, textAlign: 'center' },
   logo: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 24 },
-  title: { fontSize: 22, fontWeight: 800, color: '#111827', margin: 0, letterSpacing: 1 },
-  badge: { fontSize: 11, fontWeight: 700, backgroundColor: '#1F2937', color: '#FFF', padding: '3px 8px', borderRadius: 4 },
-  subtitle: { fontSize: 14, color: '#6B7280', margin: '0 0 24px' },
+  title: { fontSize: 22, fontWeight: 800, color: '#FAFAFA', margin: 0, letterSpacing: 1 },
+  badge: { fontSize: 11, fontWeight: 700, backgroundColor: '#10B981', color: '#FAFAFA', padding: '3px 8px', borderRadius: 4 },
+  subtitle: { fontSize: 14, color: '#A1A1AA', margin: '0 0 24px' },
   userGrid: { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 },
-  userBtn: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, padding: 20, borderRadius: 16, border: '2px solid #E5E7EB', backgroundColor: '#FFF', cursor: 'pointer', transition: 'all 0.15s' },
-  userAvatar: { width: 48, height: 48, borderRadius: 24, color: '#FFF', fontSize: 22, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' },
-  userName: { fontSize: 14, fontWeight: 700, color: '#111827' },
+  userBtn: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, padding: 20, borderRadius: 16, border: '1px solid rgba(255,255,255,0.06)', backgroundColor: '#18181B', cursor: 'pointer', transition: 'all 0.15s' },
+  userAvatar: { width: 48, height: 48, borderRadius: 24, color: '#FAFAFA', fontSize: 22, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' },
+  userName: { fontSize: 14, fontWeight: 700, color: '#FAFAFA' },
   userRole: { fontSize: 11, fontWeight: 600 },
-  backBtn: { background: 'none', border: 'none', fontSize: 14, color: '#6B7280', cursor: 'pointer', fontWeight: 600, marginBottom: 16, padding: 0 },
-  pinTitle: { fontSize: 20, fontWeight: 800, color: '#111827', margin: '0 0 4px' },
+  backBtn: { background: 'none', border: 'none', fontSize: 14, color: '#A1A1AA', cursor: 'pointer', fontWeight: 600, marginBottom: 16, padding: 0 },
+  pinTitle: { fontSize: 20, fontWeight: 800, color: '#FAFAFA', margin: '0 0 4px' },
   pinDots: { display: 'flex', gap: 12, justifyContent: 'center', margin: '24px 0 16px' },
   dot: { width: 18, height: 18, borderRadius: 9, transition: 'background-color 0.15s' },
-  error: { color: '#DC2626', fontSize: 13, fontWeight: 600, margin: '0 0 8px' },
-  loading: { color: '#6B7280', fontSize: 13, margin: '0 0 8px' },
+  error: { color: '#EF4444', fontSize: 13, fontWeight: 600, margin: '0 0 8px' },
+  loading: { color: '#A1A1AA', fontSize: 13, margin: '0 0 8px' },
   numpad: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, maxWidth: 280, margin: '0 auto' },
-  numKey: { height: 64, borderRadius: 16, border: '1px solid #E5E7EB', backgroundColor: '#FFF', fontSize: 24, fontWeight: 700, cursor: 'pointer', color: '#1F2937', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.1s' },
+  numKey: { height: 64, borderRadius: 16, border: '1px solid rgba(255,255,255,0.06)', backgroundColor: '#18181B', fontSize: 24, fontWeight: 700, cursor: 'pointer', color: '#FAFAFA', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.1s' },
 };

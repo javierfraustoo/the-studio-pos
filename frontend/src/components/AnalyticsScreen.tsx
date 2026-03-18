@@ -85,7 +85,7 @@ export default function AnalyticsScreen() {
             <KpiCard label="Ordenes" value={`${orderCount}`} color="#2563EB" />
             <KpiCard label="Ticket Promedio" value={`$${avgTicket.toFixed(0)}`} color="#7C3AED" sub="Venta total / Ordenes" />
             <KpiCard label="COGS del dia" value={`$${recipeCost.toFixed(0)}`} color="#D97706" sub="Costo total insumos" />
-            <KpiCard label="Merma %" value={`${wastePercent}%`} color="#DC2626" sub={`$${wasteCost.toFixed(0)} perdidos`} />
+            <KpiCard label="Merma %" value={`${wastePercent}%`} color="#EF4444" sub={`$${wasteCost.toFixed(0)} perdidos`} />
           </div>
 
           {/* Main Grid: 3 columns */}
@@ -104,7 +104,7 @@ export default function AnalyticsScreen() {
               {top5Profitable && top5Profitable.length > 0 ? (
                 top5Profitable.map((p, i) => (
                   <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: '1px solid var(--border-light)' }}>
-                    <span style={{ fontSize: 16, fontWeight: 800, color: i === 0 ? '#059669' : 'var(--text-faint)', width: 24 }}>#{i + 1}</span>
+                    <span style={{ fontSize: 16, fontWeight: 800, color: i === 0 ? '#10B981' : 'var(--text-faint)', width: 24 }}>#{i + 1}</span>
                     <div style={{ flex: 1 }}>
                       <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--text-primary)' }}>{p.name}</div>
                       <div style={{ fontSize: 11, color: 'var(--text-faint)' }}>

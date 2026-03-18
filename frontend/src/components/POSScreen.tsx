@@ -9,52 +9,46 @@ import ConfirmModal from './ConfirmModal';
 function CategoryTabs() {
   const { selectedCategory, setSelectedCategory, categories } = useStore();
   return (
-    <div style={styles.categoryBar}>
-      {categories.map((cat) => (
-        <button
-          key={cat.id}
-          onClick={() => setSelectedCategory(cat.id)}
-          style={{
-            ...styles.categoryTab,
-            backgroundColor: selectedCategory === cat.id ? cat.color : 'var(--bg-hover)',
-            color: selectedCategory === cat.id ? '#FFF' : 'var(--text-secondary)',
-          }}
-        >
-          {cat.name}
-        </button>
-      ))}
+    <div style={S.categoryBar}>
+      {categories.map((cat) => {
+        const isActive = selectedCategory === cat.id;
+        return (
+          <button key={cat.id} onClick={() => setSelectedCategory(cat.id)}
+            style={{
+              ...S.categoryTab,
+              backgroundColor: isActive ? 'rgba(16,185,129,0.12)' : 'rgba(255,255,255,0.03)',
+              color: isActive ? '#10B981' : '#A1A1AA',
+              borderColor: isActive ? 'rgba(16,185,129,0.25)' : 'rgba(255,255,255,0.06)',
+            }}>
+            {cat.name}
+          </button>
+        );
+      })}
     </div>
   );
 }
 
-// ─── Product Grid (compact rectangles for touch) ────────────────────────────
+// ─── Product Grid ────────────────────────────────────────────────────────
 
 function ProductGrid() {
-  const { selectedCategory, products, categories, openModifierSheet, addToCart } = useStore();
+  const { selectedCategory, products, categories, openModifierSheet } = useStore();
   const filtered = products.filter((p) => p.category_id === selectedCategory);
   const cat = categories.find((c) => c.id === selectedCategory);
 
-  const handleTap = (product: Product) => {
-    openModifierSheet(product);
-  };
-
   return (
-    <div style={styles.grid}>
+    <div style={S.grid}>
       {filtered.map((p) => (
-        <button
-          key={p.id}
-          onClick={() => handleTap(p)}
-          style={{ ...styles.productCard, borderLeft: `4px solid ${cat?.color || '#78350F'}` }}
-        >
-          <span style={styles.productName}>{p.name}</span>
-          <span style={styles.productPrice}>${p.price}</span>
+        <button key={p.id} data-product="true" onClick={() => openModifierSheet(p)}
+          style={{ ...S.productCard, borderLeft: `3px solid ${cat?.color || '#10B981'}` }}>
+          <span style={S.productName}>{p.name}</span>
+          <span style={S.productPrice}>${p.price}</span>
         </button>
       ))}
     </div>
   );
 }
 
-// ─── Modifier & Notes Sheet (centered modal, collapsible) ───────────────────
+// ─── Modifier Sheet ─────────────────────────────────────────────────────
 
 function ModifierSheet() {
   const { modifierSheetProduct, closeModifierSheet, addToCart, modifierGroups } = useStore();
@@ -99,9 +93,7 @@ function ModifierSheet() {
     for (const group of groups) {
       const sel = selected[group.id] || [];
       for (const mod of group.modifiers) {
-        if (sel.includes(mod.id)) {
-          mods.push({ id: mod.id, name: mod.name, shortName: mod.shortName, priceAdjustment: mod.priceAdjustment });
-        }
+        if (sel.includes(mod.id)) mods.push({ id: mod.id, name: mod.name, shortName: mod.shortName, priceAdjustment: mod.priceAdjustment });
       }
       if (sel.length === 0 && group.isRequired && group.selectionType === 'single') {
         const def = group.modifiers.find((m) => m.isDefault) || group.modifiers[0];
@@ -128,40 +120,44 @@ function ModifierSheet() {
   };
 
   return (
-    <div style={styles.overlay} onClick={handleClose}>
-      <div style={styles.sheet} onClick={(e) => e.stopPropagation()}>
-        <div style={styles.sheetHeader}>
+    <div style={S.overlay} onClick={handleClose}>
+      <div style={S.sheet} onClick={(e) => e.stopPropagation()}>
+        <div style={S.sheetHeader}>
           <div>
-            <h2 style={styles.sheetTitle}>{product.name}</h2>
-            <span style={styles.sheetPrice}>${(product.price + modTotal).toFixed(0)} MXN</span>
+            <h2 style={S.sheetTitle}>{product.name}</h2>
+            <span style={S.sheetPrice}>${(product.price + modTotal).toFixed(0)} MXN</span>
           </div>
-          <button onClick={handleClose} style={styles.closeBtn}>✕</button>
+          <button onClick={handleClose} style={S.closeBtn}>✕</button>
         </div>
 
-        <div style={styles.sheetBody}>
+        <div style={S.sheetBody}>
           {groups.map((group) => {
             const isCollapsed = collapsed[group.id] || false;
             const summary = getGroupSummary(group.id);
             return (
-              <div key={group.id} style={styles.modSection}>
-                <button onClick={() => toggleCollapse(group.id)} style={styles.modSectionHeader}>
+              <div key={group.id} style={S.modSection}>
+                <button onClick={() => toggleCollapse(group.id)} style={S.modSectionHeader}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontSize: 14, color: 'var(--text-faint)' }}>{isCollapsed ? '▸' : '▾'}</span>
-                    <span style={styles.modGroupTitle}>{group.name}</span>
-                    {group.isRequired && <span style={styles.required}>requerido</span>}
+                    <span style={{ fontSize: 14, color: '#52525B' }}>{isCollapsed ? '▸' : '▾'}</span>
+                    <span style={S.modGroupTitle}>{group.name}</span>
+                    {group.isRequired && <span style={S.required}>requerido</span>}
                   </div>
-                  {summary && <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{summary}</span>}
+                  {summary && <span style={{ fontSize: 12, color: '#71717A' }}>{summary}</span>}
                 </button>
                 {!isCollapsed && (
-                  <div style={styles.modOptions}>
+                  <div style={S.modOptions}>
                     {group.modifiers.map((mod) => {
                       const isSel = (selected[group.id] || []).includes(mod.id);
                       return (
                         <button key={mod.id} onClick={() => toggleModifier(group.id, mod.id, group.selectionType)}
-                          style={{ ...styles.modBtn, backgroundColor: isSel ? 'var(--accent)' : 'var(--bg-secondary)', color: isSel ? 'var(--accent-text)' : 'var(--text-primary)', borderColor: isSel ? 'var(--accent)' : 'var(--border)' }}>
-                          {isSel && <span style={{ position: 'absolute', top: 3, right: 5, fontSize: 10, fontWeight: 800 }}>✓</span>}
+                          style={{
+                            ...S.modBtn,
+                            backgroundColor: isSel ? 'rgba(16,185,129,0.12)' : 'rgba(255,255,255,0.03)',
+                            color: isSel ? '#10B981' : '#D4D4D8',
+                            borderColor: isSel ? 'rgba(16,185,129,0.3)' : 'rgba(255,255,255,0.08)',
+                          }}>
                           <span style={{ fontWeight: 600 }}>{mod.name}</span>
-                          {mod.priceAdjustment > 0 && <span style={{ fontSize: 11, opacity: 0.7 }}>+${mod.priceAdjustment}</span>}
+                          {mod.priceAdjustment > 0 && <span style={{ fontSize: 11, opacity: 0.6 }}>+${mod.priceAdjustment}</span>}
                         </button>
                       );
                     })}
@@ -171,32 +167,31 @@ function ModifierSheet() {
             );
           })}
 
-          {/* UNIVERSAL NOTES — available for ALL products */}
-          <div style={styles.modSection}>
-            <button onClick={() => toggleCollapse('__notes__')} style={styles.modSectionHeader}>
+          <div style={S.modSection}>
+            <button onClick={() => toggleCollapse('__notes__')} style={S.modSectionHeader}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ fontSize: 14, color: 'var(--text-faint)' }}>{collapsed['__notes__'] ? '▸' : '▾'}</span>
-                <span style={styles.modGroupTitle}>Notas</span>
+                <span style={{ fontSize: 14, color: '#52525B' }}>{collapsed['__notes__'] ? '▸' : '▾'}</span>
+                <span style={S.modGroupTitle}>Notas</span>
               </div>
-              {notes && <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{notes.substring(0, 25)}...</span>}
+              {notes && <span style={{ fontSize: 12, color: '#71717A' }}>{notes.substring(0, 25)}...</span>}
             </button>
             {!collapsed['__notes__'] && (
               <input type="text" value={notes} onChange={(e) => setNotes(e.target.value)}
-                placeholder="Ej: Extra caliente, sin crema, calentar croissant..."
-                style={{ ...styles.notesInput, margin: '0 0 12px 24px', width: 'calc(100% - 24px)' }} />
+                placeholder="Ej: Extra caliente, sin crema..."
+                style={{ ...S.notesInput, margin: '0 0 12px 24px', width: 'calc(100% - 24px)' }} />
             )}
           </div>
         </div>
 
-        <button onClick={handleAdd} style={styles.addBtn}>
-          Agregar al pedido — ${(product.price + modTotal).toFixed(0)}
+        <button onClick={handleAdd} style={S.addBtn}>
+          Agregar — ${(product.price + modTotal).toFixed(0)}
         </button>
       </div>
     </div>
   );
 }
 
-// ─── Cart Panel ─────────────────────────────────────────────────────────────
+// ─── Cart Panel (Área de Pedido) ─────────────────────────────────────────
 
 function CartPanel() {
   const { cart, removeFromCart, updateQuantity, clearCart, cartSubtotal, processOrder } = useStore();
@@ -214,21 +209,19 @@ function CartPanel() {
     try {
       const order = await processOrder(method, customerName, orderType);
       if (order) setLastOrder({ orderNumber: order.order_number, total: order.total, paymentMethod: order.payment_method });
-    } catch (err) {
-      console.error(err);
-    }
+    } catch (err) { console.error(err); }
     setProcessing(false);
   };
 
   if (lastOrder) {
     return (
-      <div style={styles.cartPanel}>
+      <div style={S.cartPanel}>
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-          <div style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: 'var(--success-bg)', color: 'var(--success)', fontSize: 28, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>✓</div>
-          <h2 style={{ fontSize: 22, fontWeight: 700, margin: 0, color: 'var(--text-primary)' }}>Orden #{lastOrder.orderNumber}</h2>
-          <p style={{ fontSize: 14, color: 'var(--text-muted)', margin: '4px 0 0' }}>{lastOrder.paymentMethod === 'cash' ? 'Efectivo' : 'Tarjeta'} — ${lastOrder.total.toFixed(2)}</p>
-          <p style={{ fontSize: 12, color: 'var(--text-faint)', marginTop: 8 }}>Recibo impreso · Enviado a KDS</p>
-          <button onClick={() => setLastOrder(null)} style={{ ...styles.checkoutBtn, marginTop: 24 }}>Nueva orden</button>
+          <div style={{ width: 56, height: 56, borderRadius: 28, background: 'linear-gradient(135deg, #10B981, #059669)', color: '#FFF', fontSize: 28, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>✓</div>
+          <h2 style={{ fontSize: 24, fontWeight: 800, margin: 0, color: '#FAFAFA', letterSpacing: '-0.02em' }}>Orden #{lastOrder.orderNumber}</h2>
+          <p style={{ fontSize: 14, color: '#71717A', margin: '6px 0 0' }}>{lastOrder.paymentMethod === 'cash' ? 'Efectivo' : 'Tarjeta'} — ${lastOrder.total.toFixed(2)}</p>
+          <p style={{ fontSize: 11, color: '#3F3F46', marginTop: 8 }}>Enviado a KDS</p>
+          <button onClick={() => setLastOrder(null)} style={{ ...S.checkoutBtn, marginTop: 24, width: '80%' }}>Nueva orden</button>
         </div>
       </div>
     );
@@ -236,63 +229,77 @@ function CartPanel() {
 
   if (showCheckout && cart.length > 0) {
     return (
-      <div style={styles.cartPanel}>
+      <div style={S.cartPanel}>
         <div style={{ padding: '16px 16px 0' }}>
-          <button onClick={() => setShowCheckout(false)} style={{ fontSize: 14, color: 'var(--text-primary)', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>← Pedido</button>
+          <button onClick={() => setShowCheckout(false)} style={{ fontSize: 13, color: '#A1A1AA', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>← Pedido</button>
         </div>
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24, gap: 16 }}>
-          <h2 style={{ fontSize: 42, fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>${subtotal.toFixed(2)}</h2>
-          <p style={{ fontSize: 14, color: 'var(--text-muted)', margin: 0 }}>Total a cobrar</p>
-          <button onClick={() => handlePay('cash')} disabled={processing} style={{ ...styles.payBtn, backgroundColor: '#065F46' }}>{processing ? 'Procesando...' : 'Efectivo'}</button>
-          <button onClick={() => handlePay('card')} disabled={processing} style={{ ...styles.payBtn, backgroundColor: '#1E40AF' }}>{processing ? 'Procesando...' : 'Tarjeta'}</button>
+          <h2 style={{ fontSize: 44, fontWeight: 800, margin: 0, color: '#FAFAFA', letterSpacing: '-0.03em' }}>${subtotal.toFixed(2)}</h2>
+          <p style={{ fontSize: 13, color: '#52525B', margin: 0 }}>Total a cobrar</p>
+          <button onClick={() => handlePay('cash')} disabled={processing}
+            style={{ ...S.payBtn, background: 'linear-gradient(135deg, #059669, #10B981)' }}>
+            {processing ? 'Procesando...' : 'Efectivo'}
+          </button>
+          <button onClick={() => handlePay('card')} disabled={processing}
+            style={{ ...S.payBtn, background: 'linear-gradient(135deg, #2563EB, #3B82F6)' }}>
+            {processing ? 'Procesando...' : 'Tarjeta'}
+          </button>
         </div>
       </div>
     );
   }
 
   return (
-    <div style={styles.cartPanel}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 16px 0' }}>
-        <h2 style={{ fontSize: 16, fontWeight: 700, margin: 0, color: 'var(--text-primary)' }}>Pedido</h2>
-        {cart.length > 0 && <button onClick={() => setShowClearConfirm(true)} style={{ fontSize: 12, color: '#EF4444', background: 'none', border: 'none', cursor: 'pointer' }}>Limpiar</button>}
+    <div style={S.cartPanel}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 16px 0' }}>
+        <h2 style={{ fontSize: 15, fontWeight: 700, margin: 0, color: '#FAFAFA', letterSpacing: '-0.01em' }}>Pedido</h2>
+        {cart.length > 0 && <button onClick={() => setShowClearConfirm(true)} style={{ fontSize: 11, color: '#EF4444', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 500 }}>Limpiar</button>}
       </div>
-      <div style={{ padding: '8px 16px', display: 'flex', gap: 6 }}>
-        <button onClick={() => setOrderType('dine_in')} style={{ ...styles.typeBtn, backgroundColor: orderType === 'dine_in' ? 'var(--accent)' : 'var(--bg-hover)', color: orderType === 'dine_in' ? 'var(--accent-text)' : 'var(--text-secondary)' }}>Aqui</button>
-        <button onClick={() => setOrderType('to_go')} style={{ ...styles.typeBtn, backgroundColor: orderType === 'to_go' ? 'var(--accent)' : 'var(--bg-hover)', color: orderType === 'to_go' ? 'var(--accent-text)' : 'var(--text-secondary)' }}>Llevar</button>
+      <div style={{ padding: '8px 16px', display: 'flex', gap: 4 }}>
+        <button onClick={() => setOrderType('dine_in')}
+          style={{ ...S.typeBtn, backgroundColor: orderType === 'dine_in' ? 'rgba(16,185,129,0.12)' : 'rgba(255,255,255,0.03)', color: orderType === 'dine_in' ? '#10B981' : '#71717A', border: `1px solid ${orderType === 'dine_in' ? 'rgba(16,185,129,0.25)' : 'rgba(255,255,255,0.06)'}` }}>
+          Aquí
+        </button>
+        <button onClick={() => setOrderType('to_go')}
+          style={{ ...S.typeBtn, backgroundColor: orderType === 'to_go' ? 'rgba(16,185,129,0.12)' : 'rgba(255,255,255,0.03)', color: orderType === 'to_go' ? '#10B981' : '#71717A', border: `1px solid ${orderType === 'to_go' ? 'rgba(16,185,129,0.25)' : 'rgba(255,255,255,0.06)'}` }}>
+          Llevar
+        </button>
       </div>
-      <input value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder="Nombre del cliente" style={styles.nameInput} />
+      <input value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder="Nombre del cliente" style={S.nameInput} />
 
       <div style={{ flex: 1, overflowY: 'auto', padding: '0 16px' }}>
-        {cart.length === 0 ? <p style={{ color: 'var(--text-faint)', textAlign: 'center', marginTop: 40, fontSize: 13 }}>Agrega productos</p> : cart.map((item) => (
-          <div key={item.cartItemId} style={{ padding: '10px 0', borderBottom: '1px solid var(--border-light)' }}>
+        {cart.length === 0 ? (
+          <p style={{ color: '#3F3F46', textAlign: 'center', marginTop: 40, fontSize: 13 }}>Agrega productos</p>
+        ) : cart.map((item) => (
+          <div key={item.cartItemId} style={{ padding: '10px 0', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ fontWeight: 600, fontSize: 13, color: 'var(--text-primary)' }}>{item.product.name}</span>
-              <span style={{ fontWeight: 600, fontSize: 13, color: 'var(--text-primary)' }}>${item.lineTotal}</span>
+              <span style={{ fontWeight: 600, fontSize: 13, color: '#FAFAFA' }}>{item.product.name}</span>
+              <span style={{ fontWeight: 600, fontSize: 13, color: '#FAFAFA', fontVariantNumeric: 'tabular-nums' }}>${item.lineTotal}</span>
             </div>
-            {item.modifiers.length > 0 && <div style={{ display: 'flex', gap: 4, marginTop: 3, flexWrap: 'wrap' }}>{item.modifiers.map((m) => <span key={m.id} style={styles.modTag}>{m.shortName}{m.priceAdjustment > 0 ? ` +$${m.priceAdjustment}` : ''}</span>)}</div>}
-            {item.notes && <p style={{ fontSize: 11, color: 'var(--warning)', margin: '3px 0 0', fontStyle: 'italic' }}>📝 {item.notes}</p>}
+            {item.modifiers.length > 0 && <div style={{ display: 'flex', gap: 4, marginTop: 4, flexWrap: 'wrap' }}>{item.modifiers.map((m) => <span key={m.id} style={S.modTag}>{m.shortName}{m.priceAdjustment > 0 ? ` +$${m.priceAdjustment}` : ''}</span>)}</div>}
+            {item.notes && <p style={{ fontSize: 11, color: '#F59E0B', margin: '4px 0 0', fontStyle: 'italic' }}>{item.notes}</p>}
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
-              <button onClick={() => updateQuantity(item.cartItemId, -1)} style={styles.qtyBtn}>−</button>
-              <span style={{ fontWeight: 600, fontSize: 13, minWidth: 18, textAlign: 'center', color: 'var(--text-primary)' }}>{item.quantity}</span>
-              <button onClick={() => updateQuantity(item.cartItemId, 1)} style={styles.qtyBtn}>+</button>
-              <button onClick={() => removeFromCart(item.cartItemId)} style={{ marginLeft: 'auto', fontSize: 11, color: '#EF4444', background: 'none', border: 'none', cursor: 'pointer' }}>Quitar</button>
+              <button onClick={() => updateQuantity(item.cartItemId, -1)} style={S.qtyBtn}>−</button>
+              <span style={{ fontWeight: 600, fontSize: 13, minWidth: 18, textAlign: 'center', color: '#FAFAFA' }}>{item.quantity}</span>
+              <button onClick={() => updateQuantity(item.cartItemId, 1)} style={S.qtyBtn}>+</button>
+              <button onClick={() => removeFromCart(item.cartItemId)} style={{ marginLeft: 'auto', fontSize: 11, color: '#EF4444', background: 'none', border: 'none', cursor: 'pointer', opacity: 0.7 }}>Quitar</button>
             </div>
           </div>
         ))}
       </div>
 
       {cart.length > 0 && (
-        <div style={{ padding: 16, borderTop: '1px solid var(--border)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
-            <span style={{ fontWeight: 600, fontSize: 15, color: 'var(--text-primary)' }}>Total</span>
-            <span style={{ fontWeight: 700, fontSize: 18, color: 'var(--text-primary)' }}>${subtotal.toFixed(2)}</span>
+        <div style={{ padding: 16, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
+            <span style={{ fontWeight: 600, fontSize: 14, color: '#A1A1AA' }}>Total</span>
+            <span style={{ fontWeight: 800, fontSize: 20, color: '#FAFAFA', fontVariantNumeric: 'tabular-nums' }}>${subtotal.toFixed(2)}</span>
           </div>
-          <button onClick={() => setShowCheckout(true)} style={styles.checkoutBtn}>Cobrar ${subtotal.toFixed(0)}</button>
+          <button onClick={() => setShowCheckout(true)} style={S.checkoutBtn}>Cobrar ${subtotal.toFixed(0)}</button>
         </div>
       )}
 
-      <ConfirmModal open={showClearConfirm} title="¿Limpiar pedido?" message={`Se eliminaran ${cart.length} productos del pedido.`}
-        confirmLabel="Si, limpiar" cancelLabel="Cancelar" danger
+      <ConfirmModal open={showClearConfirm} title="¿Limpiar pedido?" message={`Se eliminarán ${cart.length} productos del pedido.`}
+        confirmLabel="Sí, limpiar" cancelLabel="Cancelar" danger
         onConfirm={() => { clearCart(); setShowClearConfirm(false); }} onCancel={() => setShowClearConfirm(false)} />
     </div>
   );
@@ -302,8 +309,8 @@ function CartPanel() {
 
 export default function POSScreen() {
   return (
-    <div style={styles.posLayout}>
-      <div style={styles.menuSide}>
+    <div style={S.posLayout}>
+      <div style={S.menuSide}>
         <CategoryTabs />
         <ProductGrid />
       </div>
@@ -315,41 +322,96 @@ export default function POSScreen() {
 
 // ─── Styles ─────────────────────────────────────────────────────────────────
 
-const styles: Record<string, React.CSSProperties> = {
+const S: Record<string, React.CSSProperties> = {
   posLayout: { display: 'flex', height: '100%' },
-  menuSide: { flex: 1, minWidth: '75%', display: 'flex', flexDirection: 'column', padding: 16, overflowY: 'auto', backgroundColor: 'var(--bg-primary)' },
-  categoryBar: { display: 'flex', gap: 6, marginBottom: 12, flexWrap: 'wrap' },
-  categoryTab: { padding: '8px 18px', borderRadius: 20, border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: 13 },
+  menuSide: { flex: 1, minWidth: '75%', display: 'flex', flexDirection: 'column', padding: 16, overflowY: 'auto', backgroundColor: '#09090B' },
+  categoryBar: { display: 'flex', gap: 6, marginBottom: 14, flexWrap: 'wrap' },
+  categoryTab: { padding: '8px 18px', borderRadius: 12, border: '1px solid', cursor: 'pointer', fontWeight: 600, fontSize: 13, transition: 'all 0.2s ease' },
 
-  // Product grid — compact touch-friendly rectangles
-  grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 12, flex: 1, alignContent: 'start' },
-  productCard: { display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '20px 22px', borderRadius: 14, border: '1px solid var(--border)', backgroundColor: 'var(--bg-card)', cursor: 'pointer', textAlign: 'left', minHeight: 120, transition: 'box-shadow 0.15s' },
-  productName: { fontWeight: 700, fontSize: 18, color: 'var(--text-primary)', lineHeight: 1.3 },
-  productPrice: { fontWeight: 600, fontSize: 16, color: 'var(--text-muted)', marginTop: 6 },
+  grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 10, flex: 1, alignContent: 'start' },
+  productCard: {
+    display: 'flex', flexDirection: 'column', justifyContent: 'center',
+    padding: '18px 20px', borderRadius: 16,
+    border: '1px solid rgba(255,255,255,0.06)',
+    backgroundColor: '#18181B', cursor: 'pointer', textAlign: 'left',
+    minHeight: 100, transition: 'all 0.25s cubic-bezier(0.4,0,0.2,1)',
+  },
+  productName: { fontWeight: 700, fontSize: 16, color: '#FAFAFA', lineHeight: 1.3, letterSpacing: '-0.01em' },
+  productPrice: { fontWeight: 600, fontSize: 15, color: '#52525B', marginTop: 6, fontVariantNumeric: 'tabular-nums' },
 
-  // Cart — strict 25vw of screen, compact sidebar
-  cartPanel: { width: '25vw', maxWidth: '25vw', minWidth: 220, backgroundColor: 'var(--bg-secondary)', borderLeft: '1px solid var(--border)', display: 'flex', flexDirection: 'column', height: '100%', flexShrink: 0, flexGrow: 0, flexBasis: '25vw' },
-  typeBtn: { flex: 1, padding: '7px 0', borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: 12 },
-  nameInput: { margin: '0 16px 8px', padding: '7px 10px', borderRadius: 8, border: '1px solid var(--border)', fontSize: 13, outline: 'none', backgroundColor: 'var(--bg-input)', color: 'var(--text-primary)' },
-  modTag: { fontSize: 10, backgroundColor: 'var(--bg-hover)', padding: '2px 5px', borderRadius: 4, color: 'var(--text-secondary)' },
-  qtyBtn: { width: 26, height: 26, borderRadius: 6, border: '1px solid var(--border)', backgroundColor: 'var(--bg-secondary)', cursor: 'pointer', fontWeight: 700, fontSize: 15, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-primary)' },
-  checkoutBtn: { width: '100%', padding: '12px 0', borderRadius: 10, border: 'none', backgroundColor: 'var(--accent)', color: 'var(--accent-text)', fontSize: 15, fontWeight: 700, cursor: 'pointer' },
-  payBtn: { width: '100%', padding: '14px 0', borderRadius: 10, border: 'none', color: '#FFF', fontSize: 15, fontWeight: 700, cursor: 'pointer' },
+  cartPanel: {
+    width: '25vw', maxWidth: '25vw', minWidth: 240,
+    backgroundColor: '#111113',
+    borderLeft: '1px solid rgba(255,255,255,0.06)',
+    display: 'flex', flexDirection: 'column', height: '100%',
+    flexShrink: 0, flexGrow: 0, flexBasis: '25vw',
+  },
+  typeBtn: { flex: 1, padding: '7px 0', borderRadius: 8, cursor: 'pointer', fontWeight: 600, fontSize: 12, transition: 'all 0.2s ease' },
+  nameInput: {
+    margin: '0 16px 8px', padding: '8px 12px', borderRadius: 10,
+    border: '1px solid rgba(255,255,255,0.06)', fontSize: 13, outline: 'none',
+    backgroundColor: 'rgba(255,255,255,0.03)', color: '#FAFAFA',
+  },
+  modTag: { fontSize: 10, backgroundColor: 'rgba(255,255,255,0.06)', padding: '2px 6px', borderRadius: 6, color: '#A1A1AA' },
+  qtyBtn: {
+    width: 28, height: 28, borderRadius: 8,
+    border: '1px solid rgba(255,255,255,0.08)',
+    backgroundColor: 'rgba(255,255,255,0.04)', cursor: 'pointer',
+    fontWeight: 700, fontSize: 15, display: 'flex', alignItems: 'center', justifyContent: 'center',
+    color: '#D4D4D8',
+  },
+  checkoutBtn: {
+    width: '100%', padding: '13px 0', borderRadius: 14, border: 'none',
+    background: 'linear-gradient(135deg, #10B981, #059669)',
+    color: '#FFF', fontSize: 15, fontWeight: 700, cursor: 'pointer',
+    boxShadow: '0 4px 20px rgba(16,185,129,0.2)',
+  },
+  payBtn: {
+    width: '100%', padding: '14px 0', borderRadius: 14, border: 'none',
+    color: '#FFF', fontSize: 15, fontWeight: 700, cursor: 'pointer',
+    boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
+  },
 
-  // Modifier Sheet
-  overlay: { position: 'fixed', inset: 0, backgroundColor: 'var(--overlay)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 },
-  sheet: { width: '95%', maxWidth: 500, maxHeight: '85vh', backgroundColor: 'var(--bg-card)', borderRadius: 18, display: 'flex', flexDirection: 'column', boxShadow: '0 25px 50px rgba(0,0,0,0.25)' },
-  sheetHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '18px 22px 10px' },
-  sheetTitle: { fontSize: 20, fontWeight: 800, color: 'var(--text-primary)', margin: 0 },
-  sheetPrice: { fontSize: 14, fontWeight: 600, color: 'var(--text-muted)' },
-  closeBtn: { width: 34, height: 34, borderRadius: 17, border: '1px solid var(--border)', backgroundColor: 'var(--bg-hover)', cursor: 'pointer', fontSize: 15, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' },
-  sheetBody: { flex: 1, overflowY: 'auto', padding: '0 22px 12px' },
-  modSection: { marginBottom: 2, borderBottom: '1px solid var(--border-light)' },
-  modSectionHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', padding: '10px 0', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', color: 'var(--text-primary)' },
-  modGroupTitle: { fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase' as const, letterSpacing: 0.5 },
-  required: { fontSize: 9, fontWeight: 600, color: '#FFF', backgroundColor: '#EF4444', padding: '1px 5px', borderRadius: 4 },
-  modOptions: { display: 'flex', flexWrap: 'wrap', gap: 6, padding: '2px 0 10px 22px' },
-  modBtn: { padding: '8px 14px', borderRadius: 8, border: '1.5px solid', cursor: 'pointer', fontSize: 12, fontWeight: 500, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, transition: 'all 0.15s', minWidth: 70, position: 'relative' as const },
-  notesInput: { padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)', fontSize: 13, outline: 'none', boxSizing: 'border-box' as const, backgroundColor: 'var(--bg-input)', color: 'var(--text-primary)' },
-  addBtn: { margin: '0 22px 22px', padding: '12px 0', borderRadius: 10, border: 'none', backgroundColor: 'var(--accent)', color: 'var(--accent-text)', fontSize: 15, fontWeight: 700, cursor: 'pointer' },
+  overlay: { position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, backdropFilter: 'blur(8px)' },
+  sheet: {
+    width: '95%', maxWidth: 480, maxHeight: '85vh',
+    backgroundColor: '#18181B', borderRadius: 24,
+    display: 'flex', flexDirection: 'column',
+    boxShadow: '0 25px 60px rgba(0,0,0,0.5)',
+    border: '1px solid rgba(255,255,255,0.08)',
+    animation: 'fadeIn 0.2s ease-out',
+  },
+  sheetHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px 24px 12px' },
+  sheetTitle: { fontSize: 22, fontWeight: 800, color: '#FAFAFA', margin: 0, letterSpacing: '-0.02em' },
+  sheetPrice: { fontSize: 14, fontWeight: 600, color: '#52525B' },
+  closeBtn: {
+    width: 36, height: 36, borderRadius: 12,
+    border: '1px solid rgba(255,255,255,0.08)',
+    backgroundColor: 'rgba(255,255,255,0.04)', cursor: 'pointer',
+    fontSize: 15, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#71717A',
+  },
+  sheetBody: { flex: 1, overflowY: 'auto', padding: '0 24px 12px' },
+  modSection: { marginBottom: 2, borderBottom: '1px solid rgba(255,255,255,0.04)' },
+  modSectionHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', padding: '10px 0', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', color: '#FAFAFA' },
+  modGroupTitle: { fontSize: 11, fontWeight: 700, color: '#71717A', textTransform: 'uppercase' as const, letterSpacing: '0.08em' },
+  required: { fontSize: 9, fontWeight: 600, color: '#FFF', backgroundColor: '#EF4444', padding: '1px 6px', borderRadius: 4 },
+  modOptions: { display: 'flex', flexWrap: 'wrap', gap: 6, padding: '2px 0 10px 24px' },
+  modBtn: {
+    padding: '8px 14px', borderRadius: 10, border: '1px solid',
+    cursor: 'pointer', fontSize: 12, fontWeight: 500,
+    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
+    transition: 'all 0.2s ease', minWidth: 70, position: 'relative' as const,
+  },
+  notesInput: {
+    padding: '8px 12px', borderRadius: 10,
+    border: '1px solid rgba(255,255,255,0.06)', fontSize: 13, outline: 'none',
+    boxSizing: 'border-box' as const,
+    backgroundColor: 'rgba(255,255,255,0.03)', color: '#FAFAFA',
+  },
+  addBtn: {
+    margin: '0 24px 24px', padding: '13px 0', borderRadius: 14, border: 'none',
+    background: 'linear-gradient(135deg, #10B981, #059669)',
+    color: '#FFF', fontSize: 15, fontWeight: 700, cursor: 'pointer',
+    boxShadow: '0 4px 20px rgba(16,185,129,0.2)',
+  },
 };
