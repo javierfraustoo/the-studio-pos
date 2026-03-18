@@ -213,6 +213,9 @@ function CartPanel() {
   const [editingItemDiscount, setEditingItemDiscount] = useState<string | null>(null);
   const [pendingItemDiscount, setPendingItemDiscount] = useState(0);
   const [showItemOverride, setShowItemOverride] = useState(false);
+  const [guestCount, setGuestCount] = useState(1);
+
+  const IVA_RATE = 0.08; // 8% IVA fronterizo
 
   const subtotal = cart.reduce((s, item) => {
     const disc = itemDiscounts[item.cartItemId];
@@ -221,6 +224,9 @@ function CartPanel() {
   }, 0);
   const discountAmount = subtotal * (discountPercent / 100);
   const total = subtotal - discountAmount;
+  // IVA desglose: el total YA incluye IVA (precio con impuesto incluido)
+  const baseAmount = total / (1 + IVA_RATE);
+  const ivaAmount = total - baseAmount;
 
   const handlePay = async (method: string) => {
     setProcessing(true);
@@ -239,7 +245,7 @@ function CartPanel() {
           <h2 style={{ fontSize: 24, fontWeight: 800, margin: 0, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>Orden #{lastOrder.orderNumber}</h2>
           <p style={{ fontSize: 14, color: 'var(--text-muted)', margin: '6px 0 0' }}>{lastOrder.paymentMethod === 'cash' ? 'Efectivo' : 'Tarjeta'} — ${lastOrder.total.toFixed(2)}</p>
           <p style={{ fontSize: 11, color: 'var(--text-faint)', marginTop: 8 }}>Enviado a KDS</p>
-          <button onClick={() => { setLastOrder(null); setDiscountPercent(0); setDiscountAuthorizer(''); setPendingDiscount(0); setShowDiscountInput(false); setCustomerName(''); setItemDiscounts({}); }} style={{ ...S.checkoutBtn, marginTop: 24, width: '80%' }}>Nueva orden</button>
+          <button onClick={() => { setLastOrder(null); setDiscountPercent(0); setDiscountAuthorizer(''); setPendingDiscount(0); setShowDiscountInput(false); setCustomerName(''); setItemDiscounts({}); setGuestCount(1); }} style={{ ...S.checkoutBtn, marginTop: 24, width: '80%' }}>Nueva orden</button>
         </div>
       </div>
     );
@@ -253,6 +259,9 @@ function CartPanel() {
         </div>
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24, gap: 16 }}>
           <h2 style={{ fontSize: 44, fontWeight: 800, margin: 0, color: 'var(--text-primary)', letterSpacing: '-0.03em' }}>${total.toFixed(2)}</h2>
+          <div style={{ fontSize: 11, color: 'var(--text-faint)', textAlign: 'center' }}>
+            Base: ${baseAmount.toFixed(2)} + IVA 8%: ${ivaAmount.toFixed(2)}
+          </div>
           {discountPercent > 0 && (
             <div style={{ textAlign: 'center' }}>
               <span style={{ fontSize: 13, color: 'var(--text-faint)', textDecoration: 'line-through' }}>${subtotal.toFixed(2)}</span>
@@ -289,7 +298,16 @@ function CartPanel() {
           Llevar
         </button>
       </div>
-      <input value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder="Nombre del cliente" style={S.nameInput} />
+      <div style={{ display: 'flex', gap: 6, padding: '0 16px 8px' }}>
+        <input value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder="Nombre del cliente"
+          style={{ ...S.nameInput, margin: 0, flex: 1 }} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, backgroundColor: 'var(--bg-hover)', borderRadius: 10, padding: '0 10px', border: '1px solid var(--border)', minWidth: 80 }}>
+          <span style={{ fontSize: 11, color: 'var(--text-faint)' }}>👥</span>
+          <button onClick={() => setGuestCount(Math.max(1, guestCount - 1))} style={{ ...S.qtyBtn, width: 22, height: 22, fontSize: 13 }}>−</button>
+          <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', minWidth: 14, textAlign: 'center' }}>{guestCount}</span>
+          <button onClick={() => setGuestCount(guestCount + 1)} style={{ ...S.qtyBtn, width: 22, height: 22, fontSize: 13 }}>+</button>
+        </div>
+      </div>
 
       <div style={{ flex: 1, overflowY: 'auto', padding: '0 16px' }}>
         {cart.length === 0 ? (
@@ -314,10 +332,14 @@ function CartPanel() {
                 <button onClick={() => updateQuantity(item.cartItemId, 1)} style={S.qtyBtn}>+</button>
                 {iDisc ? (
                   <button onClick={() => { const copy = { ...itemDiscounts }; delete copy[item.cartItemId]; setItemDiscounts(copy); }}
-                    style={{ marginLeft: 'auto', fontSize: 10, color: '#10B981', background: 'none', border: 'none', cursor: 'pointer' }}>✕ desc.</button>
+                    style={{ marginLeft: 'auto', fontSize: 10, fontWeight: 600, color: '#10B981', backgroundColor: 'var(--success-bg)', padding: '2px 8px', borderRadius: 6, border: '1px solid rgba(16,185,129,0.2)', cursor: 'pointer' }}>
+                    ✕ -{iDisc.percent}%
+                  </button>
                 ) : (
                   <button onClick={() => { setEditingItemDiscount(item.cartItemId); setPendingItemDiscount(0); }}
-                    style={{ marginLeft: 'auto', fontSize: 10, color: 'var(--text-faint)', background: 'none', border: 'none', cursor: 'pointer' }}>% desc.</button>
+                    style={{ marginLeft: 'auto', fontSize: 10, fontWeight: 600, color: 'var(--text-muted)', backgroundColor: 'var(--bg-hover)', padding: '2px 8px', borderRadius: 6, border: '1px solid var(--border)', cursor: 'pointer' }}>
+                    % Desc.
+                  </button>
                 )}
                 <button onClick={() => removeFromCart(item.cartItemId)} style={{ fontSize: 11, color: '#EF4444', background: 'none', border: 'none', cursor: 'pointer', opacity: 0.7 }}>Quitar</button>
               </div>
@@ -352,6 +374,15 @@ function CartPanel() {
               <span style={{ fontSize: 12, color: '#10B981', fontWeight: 600 }}>-${discountAmount.toFixed(2)}</span>
             </div>
           )}
+          {/* IVA breakdown */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
+            <span style={{ fontSize: 11, color: 'var(--text-faint)' }}>Subtotal s/IVA</span>
+            <span style={{ fontSize: 11, color: 'var(--text-faint)', fontVariantNumeric: 'tabular-nums' }}>${baseAmount.toFixed(2)}</span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+            <span style={{ fontSize: 11, color: 'var(--text-faint)' }}>IVA 8%</span>
+            <span style={{ fontSize: 11, color: 'var(--text-faint)', fontVariantNumeric: 'tabular-nums' }}>${ivaAmount.toFixed(2)}</span>
+          </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
             <span style={{ fontWeight: 600, fontSize: 14, color: 'var(--text-muted)' }}>Total</span>
             <span style={{ fontWeight: 800, fontSize: 20, color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>${total.toFixed(2)}</span>

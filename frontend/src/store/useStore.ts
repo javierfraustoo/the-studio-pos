@@ -126,7 +126,18 @@ function generateReceiptText(order: Order): string {
     if (item.notes) lines.push(`   >> ${item.notes}`);
   }
   lines.push(sep);
-  lines.push(cols('TOTAL', `$${order.total.toFixed(2)}`));
+  const orderTotal = parseFloat(String(order.total)) || 0;
+  const ivaRate = 0.08;
+  const baseAmt = orderTotal / (1 + ivaRate);
+  const ivaAmt = orderTotal - baseAmt;
+  if (order.discount && order.discount > 0) {
+    lines.push(cols('Subtotal', `$${(order.subtotal || orderTotal + order.discount).toFixed(2)}`));
+    lines.push(cols(`Descuento`, `-$${order.discount.toFixed(2)}`));
+    if (order.discount_authorized_by) lines.push(cols('  Autorizo', order.discount_authorized_by));
+  }
+  lines.push(cols('Base', `$${baseAmt.toFixed(2)}`));
+  lines.push(cols('IVA 8%', `$${ivaAmt.toFixed(2)}`));
+  lines.push(cols('TOTAL', `$${orderTotal.toFixed(2)}`));
   lines.push(cols('Pago', order.payment_method === 'cash' ? 'Efectivo' : 'Tarjeta'));
   lines.push('='.repeat(W));
   lines.push('');
