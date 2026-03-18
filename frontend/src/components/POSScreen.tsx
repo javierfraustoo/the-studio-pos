@@ -154,9 +154,9 @@ function ModifierSheet() {
                         <button key={mod.id} onClick={() => toggleModifier(group.id, mod.id, group.selectionType)}
                           style={{
                             ...S.modBtn,
-                            backgroundColor: isSel ? 'rgba(16,185,129,0.12)' : 'rgba(255,255,255,0.03)',
-                            color: isSel ? '#10B981' : '#D4D4D8',
-                            borderColor: isSel ? 'rgba(16,185,129,0.3)' : 'rgba(255,255,255,0.08)',
+                            backgroundColor: isSel ? 'var(--accent-glow)' : 'var(--bg-hover)',
+                            color: isSel ? 'var(--accent)' : 'var(--text-secondary)',
+                            borderColor: isSel ? 'rgba(16,185,129,0.3)' : 'var(--border)',
                           }}>
                           <span style={{ fontWeight: 600 }}>{mod.name}</span>
                           {mod.priceAdjustment > 0 && <span style={{ fontSize: 11, opacity: 0.6 }}>+${mod.priceAdjustment}</span>}
@@ -204,6 +204,7 @@ function CartPanel() {
   const [processing, setProcessing] = useState(false);
   const [lastOrder, setLastOrder] = useState<{ orderNumber: number; total: number; paymentMethod: string } | null>(null);
   const [discountPercent, setDiscountPercent] = useState(0);
+  const [discountAuthorizer, setDiscountAuthorizer] = useState('');
   const [showDiscountInput, setShowDiscountInput] = useState(false);
   const [showOverride, setShowOverride] = useState(false);
   const [pendingDiscount, setPendingDiscount] = useState(0);
@@ -215,7 +216,7 @@ function CartPanel() {
   const handlePay = async (method: string) => {
     setProcessing(true);
     try {
-      const order = await processOrder(method, customerName, orderType);
+      const order = await processOrder(method, customerName, orderType, discountPercent > 0 ? discountPercent : undefined, discountAuthorizer || undefined);
       if (order) setLastOrder({ orderNumber: order.order_number, total: order.total, paymentMethod: order.payment_method });
     } catch (err) { console.error(err); }
     setProcessing(false);
@@ -229,7 +230,7 @@ function CartPanel() {
           <h2 style={{ fontSize: 24, fontWeight: 800, margin: 0, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>Orden #{lastOrder.orderNumber}</h2>
           <p style={{ fontSize: 14, color: 'var(--text-muted)', margin: '6px 0 0' }}>{lastOrder.paymentMethod === 'cash' ? 'Efectivo' : 'Tarjeta'} — ${lastOrder.total.toFixed(2)}</p>
           <p style={{ fontSize: 11, color: 'var(--text-faint)', marginTop: 8 }}>Enviado a KDS</p>
-          <button onClick={() => setLastOrder(null)} style={{ ...S.checkoutBtn, marginTop: 24, width: '80%' }}>Nueva orden</button>
+          <button onClick={() => { setLastOrder(null); setDiscountPercent(0); setDiscountAuthorizer(''); setPendingDiscount(0); setShowDiscountInput(false); setCustomerName(''); }} style={{ ...S.checkoutBtn, marginTop: 24, width: '80%' }}>Nueva orden</button>
         </div>
       </div>
     );
@@ -323,21 +324,36 @@ function CartPanel() {
           </div>
           <button onClick={() => setShowCheckout(true)} style={S.checkoutBtn}>Cobrar ${total.toFixed(0)}</button>
 
-          {/* Discount button */}
-          {!showDiscountInput ? (
-            <button onClick={() => setShowDiscountInput(true)}
+          {/* Discount section */}
+          {discountPercent > 0 && !showDiscountInput ? (
+            /* Active discount — show with remove button */
+            <div style={{ marginTop: 8, display: 'flex', gap: 6, alignItems: 'center' }}>
+              <span style={{ flex: 1, fontSize: 12, color: '#10B981', fontWeight: 600, padding: '8px 12px', borderRadius: 8, backgroundColor: 'var(--success-bg)', border: '1px solid rgba(16,185,129,0.2)' }}>
+                Descuento {discountPercent}% aplicado
+              </span>
+              <button onClick={() => { setDiscountPercent(0); setDiscountAuthorizer(''); }}
+                style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)', backgroundColor: 'transparent', color: 'var(--text-faint)', fontSize: 12, cursor: 'pointer' }}>
+                ✕
+              </button>
+            </div>
+          ) : !showDiscountInput ? (
+            /* No discount — show add button */
+            <button onClick={() => { setShowDiscountInput(true); setPendingDiscount(0); }}
               style={{ width: '100%', marginTop: 8, padding: '9px 0', borderRadius: 10, border: '1px solid var(--border)', backgroundColor: 'transparent', color: 'var(--text-muted)', fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
               <Percent size={13} />
-              {discountPercent > 0 ? `Descuento: ${discountPercent}% (cambiar)` : 'Agregar descuento'}
+              Agregar descuento
             </button>
           ) : (
+            /* Input mode — enter percentage and authorize */
             <div style={{ marginTop: 8, display: 'flex', gap: 6, alignItems: 'center' }}>
-              <input type="number" min="0" max="100" placeholder="%" value={pendingDiscount || ''}
+              <input type="number" min="1" max="100" placeholder="%" value={pendingDiscount || ''}
                 onChange={e => setPendingDiscount(Math.min(100, Math.max(0, Number(e.target.value))))}
+                autoFocus
                 style={{ flex: 1, padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)', fontSize: 13, backgroundColor: 'var(--bg-input)', color: 'var(--text-primary)', outline: 'none', textAlign: 'center' }} />
-              <button onClick={() => { if (pendingDiscount > 0) { setShowOverride(true); } else { setDiscountPercent(0); setShowDiscountInput(false); } }}
-                style={{ padding: '8px 14px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg, #10B981, #059669)', color: '#FFF', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>
-                {pendingDiscount > 0 ? 'Autorizar' : 'Quitar'}
+              <button onClick={() => { if (pendingDiscount > 0) setShowOverride(true); }}
+                disabled={!pendingDiscount || pendingDiscount <= 0}
+                style={{ padding: '8px 14px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg, #10B981, #059669)', color: '#FFF', fontWeight: 700, fontSize: 12, cursor: 'pointer', opacity: pendingDiscount > 0 ? 1 : 0.4 }}>
+                Autorizar
               </button>
               <button onClick={() => { setShowDiscountInput(false); setPendingDiscount(0); }}
                 style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)', backgroundColor: 'transparent', color: 'var(--text-faint)', fontSize: 12, cursor: 'pointer' }}>
@@ -357,7 +373,7 @@ function CartPanel() {
         action="discount"
         actionLabel={`Autorizar descuento del ${pendingDiscount}%`}
         requestedBy="cajero"
-        onAuthorized={() => { setDiscountPercent(pendingDiscount); setShowDiscountInput(false); setShowOverride(false); }}
+        onAuthorized={(overrideUser) => { setDiscountPercent(pendingDiscount); setDiscountAuthorizer(overrideUser?.name || ''); setShowDiscountInput(false); setShowOverride(false); }}
         onCancel={() => setShowOverride(false)}
       />
     </div>

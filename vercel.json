@@ -12,6 +12,8 @@
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api" },
     { "source": "/health", "destination": "/api" },
+    { "source": "/kds/(.*)", "destination": "/index.html" },
+    { "source": "/admin", "destination": "/index.html" },
     { "source": "/(.*)", "destination": "/$1" }
   ]
 }

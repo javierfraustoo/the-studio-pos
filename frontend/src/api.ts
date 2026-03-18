@@ -120,6 +120,7 @@ export interface CreateOrderItem {
 export interface CreateOrderPayload {
   items: CreateOrderItem[]; paymentMethod: string;
   customerName: string; orderType: string;
+  discount?: number; discountAuthorizedBy?: string;
 }
 export function fetchOrders(date?: string) {
   const q = date ? `?date=${date}` : '';
@@ -201,6 +202,8 @@ export interface AnalyticsOrder {
   user_name: string; created_at: string;
   items: OrderItem[]; recipeCost: number;
   prepTimeMinutes: number | null; grossMargin: number;
+  discount?: number; discount_authorized_by?: string;
+  subtotal?: number;
 }
 export function fetchAnalyticsOrders(date?: string) {
   const q = date ? `?date=${date}` : '';

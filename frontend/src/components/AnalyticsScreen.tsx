@@ -260,6 +260,19 @@ export default function AnalyticsScreen() {
                               ${(order.total - order.recipeCost).toFixed(2)} ({order.grossMargin.toFixed(1)}%)
                             </span>
                           </div>
+                          {(order.discount && order.discount > 0) ? (
+                            <div>
+                              <span style={{ fontSize: 11, color: 'var(--text-faint)', display: 'block' }}>Descuento</span>
+                              <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--danger)' }}>
+                                -${order.discount.toFixed(2)}
+                              </span>
+                              {order.discount_authorized_by && (
+                                <span style={{ fontSize: 10, color: 'var(--text-faint)', display: 'block' }}>
+                                  Autorizó: {order.discount_authorized_by}
+                                </span>
+                              )}
+                            </div>
+                          ) : null}
                         </div>
                         <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
                           <thead>

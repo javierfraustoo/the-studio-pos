@@ -51,7 +51,7 @@ interface POSStore {
   // ── Orders (from API) ──
   orders: Order[];
   fetchOrders: () => Promise<void>;
-  processOrder: (paymentMethod: string, customerName: string, orderType: string) => Promise<Order | null>;
+  processOrder: (paymentMethod: string, customerName: string, orderType: string, discount?: number, discountAuthorizedBy?: string) => Promise<Order | null>;
 
   // ── Inventory (from API) ──
   inventory: InventoryItem[];
@@ -79,7 +79,7 @@ interface POSStore {
   cashDrawerOpen: boolean;
   setCashDrawerOpen: (open: boolean) => void;
   paymentTerminalStatus: 'idle' | 'processing' | 'approved';
-  simulatePayment: (method: string) => Promise<void>;
+  simulatePayment: (method: string, amount?: number) => Promise<void>;
 
   // ── UI State ──
   selectedCategory: string;
@@ -207,10 +207,13 @@ export const useStore = create<POSStore>((set, get) => ({
   fetchOrders: async () => {
     try { const orders = await api.fetchOrders(); set({ orders }); } catch { /* */ }
   },
-  processOrder: async (paymentMethod, customerName, orderType) => {
+  processOrder: async (paymentMethod, customerName, orderType, discount, discountAuthorizedBy) => {
     const { cart, simulatePayment } = get();
     if (!cart.length) return null;
-    await simulatePayment(paymentMethod);
+    const subtotal = cart.reduce((s, i) => s + i.lineTotal, 0);
+    const discountAmount = discount ? subtotal * (discount / 100) : 0;
+    const finalTotal = subtotal - discountAmount;
+    await simulatePayment(paymentMethod, finalTotal);
     const payload: api.CreateOrderPayload = {
       items: cart.map((item) => ({
         productId: item.product.id, productName: item.product.name,
@@ -219,6 +222,8 @@ export const useStore = create<POSStore>((set, get) => ({
         notes: item.notes, modifiers: item.modifiers,
       })),
       paymentMethod, customerName, orderType,
+      discount: discountAmount,
+      discountAuthorizedBy,
     };
     const order = await api.createOrder(payload);
     const receiptText = generateReceiptText(order);
@@ -262,7 +267,7 @@ export const useStore = create<POSStore>((set, get) => ({
   cashDrawerOpen: false,
   setCashDrawerOpen: (open) => set({ cashDrawerOpen: open }),
   paymentTerminalStatus: 'idle',
-  simulatePayment: async (method) => {
+  simulatePayment: async (method: string, _amount?: number) => {
     if (method === 'cash') {
       set({ cashDrawerOpen: true });
       setTimeout(() => set({ cashDrawerOpen: false }), 3000);

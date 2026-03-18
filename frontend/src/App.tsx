@@ -1,7 +1,8 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { useStore } from './store/useStore';
 import type { TabId } from './store/useStore';
+import * as api from './api';
 import { subscribePosEvents, unsubscribe } from './realtime';
 import {
   Sun, Moon, LayoutGrid, Monitor, ClipboardList, Package,
@@ -73,12 +74,22 @@ function MainApp() {
     return () => { unsubscribe(channel); };
   }, []);
 
+  // Fetch all KDS items for badge (both stations)
+  const [allKdsForBadge, setAllKdsForBadge] = useState<api.KdsItem[]>([]);
+  const refreshKdsBadge = useCallback(async () => {
+    try {
+      const [bar, kitchen] = await Promise.all([api.fetchKdsItems('bar'), api.fetchKdsItems('kitchen')]);
+      setAllKdsForBadge([...bar, ...kitchen]);
+    } catch { /* */ }
+  }, []);
+  useEffect(() => { if (isAuthenticated && menuLoaded) { refreshKdsBadge(); const id = setInterval(refreshKdsBadge, 30000); return () => clearInterval(id); } }, [isAuthenticated, menuLoaded]);
+
   // Smart badge counts
   const lowStockCount = useMemo(() => inventory.filter(i => i.stock <= i.minimumStock).length, [inventory]);
   const kdsOverdueCount = useMemo(() => {
     const now = Date.now();
-    return kdsItems.filter(i => i.status !== 'delivered' && (now - new Date(i.routed_at).getTime()) > 5 * 60 * 1000).length;
-  }, [kdsItems]);
+    return allKdsForBadge.filter(i => i.status !== 'delivered' && (now - new Date(i.routed_at).getTime()) > 5 * 60 * 1000).length;
+  }, [allKdsForBadge]);
   const wasteCount = useMemo(() => wasteLogs.length, [wasteLogs]);
 
   function getBadgeCount(tabId: TabId): number {
