@@ -179,8 +179,12 @@ CREATE TABLE IF NOT EXISTS kds_items (
   status TEXT NOT NULL DEFAULT 'pending',
   routed_at TIMESTAMPTZ DEFAULT NOW(),
   ready_at TIMESTAMPTZ,
-  delivered_at TIMESTAMPTZ
+  delivered_at TIMESTAMPTZ,
+  delivered_by TEXT
 );
+
+-- Migration: Add delivered_by if table already exists
+ALTER TABLE kds_items ADD COLUMN IF NOT EXISTS delivered_by TEXT;
 
 -- ── Waste ─────────────────────────────────────────────────────────────────
 

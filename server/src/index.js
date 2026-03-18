@@ -218,9 +218,9 @@ app.post('/api/inventory/receive', async (req, res) => {
 
 app.get('/api/orders', async (req, res) => {
   try {
-    const date = req.query.date || new Date().toISOString().slice(0, 10);
-    const dayStart = `${date}T00:00:00`;
-    const dayEnd = `${date}T23:59:59`;
+    const date = req.query.date || (() => { const n = new Date(); return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}`; })();
+    const dayStart = `${date}T00:00:00-06:00`;
+    const dayEnd = `${date}T23:59:59-06:00`;
 
     const { data: orders } = await supabase
       .from('orders')
@@ -284,9 +284,9 @@ app.post('/api/orders', async (req, res) => {
   if (!items || !items.length) return res.status(400).json({ error: 'No items' });
 
   try {
-    const today = new Date().toISOString().slice(0, 10);
-    const dayStart = `${today}T00:00:00`;
-    const dayEnd = `${today}T23:59:59`;
+    const today = (() => { const n = new Date(); return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}`; })();
+    const dayStart = `${today}T00:00:00-06:00`;
+    const dayEnd = `${today}T23:59:59-06:00`;
 
     const { data: maxRow } = await supabase
       .from('orders')
@@ -468,9 +468,9 @@ app.get('/api/kds/:station', async (req, res) => {
 app.get('/api/kds/:station/history', async (req, res) => {
   try {
     const { station } = req.params;
-    const date = req.query.date || new Date().toISOString().slice(0, 10);
-    const dayStart = `${date}T00:00:00`;
-    const dayEnd = `${date}T23:59:59`;
+    const date = req.query.date || (() => { const n = new Date(); return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}`; })();
+    const dayStart = `${date}T00:00:00-06:00`;
+    const dayEnd = `${date}T23:59:59-06:00`;
 
     const { data } = await supabase
       .from('kds_items')
@@ -506,6 +506,8 @@ app.patch('/api/kds/:itemId', async (req, res) => {
       updateObj.delivered_at = null;
     } else if (status === 'delivered') {
       updateObj.delivered_at = new Date().toISOString();
+      // Track who delivered (graceful if column doesn't exist yet)
+      if (req.user?.name) updateObj.delivered_by = req.user.name;
     }
 
     await supabase.from('kds_items').update(updateObj).eq('id', itemId);
@@ -544,9 +546,9 @@ app.patch('/api/kds/:itemId', async (req, res) => {
 
 app.get('/api/waste', async (req, res) => {
   try {
-    const date = req.query.date || new Date().toISOString().slice(0, 10);
-    const dayStart = `${date}T00:00:00`;
-    const dayEnd = `${date}T23:59:59`;
+    const date = req.query.date || (() => { const n = new Date(); return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}`; })();
+    const dayStart = `${date}T00:00:00-06:00`;
+    const dayEnd = `${date}T23:59:59-06:00`;
 
     const { data } = await supabase
       .from('waste_logs')
@@ -618,9 +620,11 @@ app.post('/api/waste', async (req, res) => {
 
 app.get('/api/analytics', async (req, res) => {
   try {
-    const date = req.query.date || new Date().toISOString().slice(0, 10);
-    const dayStart = `${date}T00:00:00`;
-    const dayEnd = `${date}T23:59:59`;
+    // Use local date from client or server local time
+    const now = new Date();
+    const localDate = req.query.date || `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+    const dayStart = `${localDate}T00:00:00-06:00`;
+    const dayEnd = `${localDate}T23:59:59-06:00`;
 
     // Revenue
     const { data: ordersToday } = await supabase
@@ -711,9 +715,10 @@ app.get('/api/analytics', async (req, res) => {
 
 app.get('/api/analytics/orders', requireRole('admin', 'supervisor'), async (req, res) => {
   try {
-    const date = req.query.date || new Date().toISOString().slice(0, 10);
-    const dayStart = `${date}T00:00:00`;
-    const dayEnd = `${date}T23:59:59`;
+    const now = new Date();
+    const date = req.query.date || `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+    const dayStart = `${date}T00:00:00-06:00`;
+    const dayEnd = `${date}T23:59:59-06:00`;
 
     const { data: orders } = await supabase
       .from('orders')
@@ -759,6 +764,9 @@ app.get('/api/analytics/orders', requireRole('admin', 'supervisor'), async (req,
       return {
         id: order.id, order_number: order.order_number, customer_name: order.customer_name,
         order_type: order.order_type, payment_method: order.payment_method, total,
+        subtotal: parseFloat(order.subtotal) || total,
+        discount: parseFloat(order.discount) || 0,
+        discount_authorized_by: order.discount_authorized_by || null,
         user_name: order.user_name || 'Sistema', created_at: order.created_at,
         items, recipeCost: rcost, prepTimeMinutes, grossMargin: Math.round(grossMargin * 10) / 10,
       };
@@ -785,7 +793,7 @@ app.get('/api/audit', requireRole('admin', 'supervisor'), async (req, res) => {
     if (userId) query = query.eq('user_id', userId);
     if (entityType) query = query.eq('entity_type', entityType);
     if (date) {
-      query = query.gte('created_at', `${date}T00:00:00`).lte('created_at', `${date}T23:59:59`);
+      query = query.gte('created_at', `${date}T00:00:00-06:00`).lte('created_at', `${date}T23:59:59-06:00`);
     }
     if (from) query = query.gte('created_at', from);
     if (to) query = query.lte('created_at', to);

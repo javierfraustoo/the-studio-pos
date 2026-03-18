@@ -90,6 +90,10 @@ function MainApp() {
     const now = Date.now();
     return allKdsForBadge.filter(i => i.status !== 'delivered' && (now - new Date(i.routed_at).getTime()) > 5 * 60 * 1000).length;
   }, [allKdsForBadge]);
+  const kdsHasUrgent = useMemo(() => {
+    const now = Date.now();
+    return allKdsForBadge.some(i => i.status !== 'delivered' && (now - new Date(i.routed_at).getTime()) > 10 * 60 * 1000);
+  }, [allKdsForBadge]);
   const wasteCount = useMemo(() => wasteLogs.length, [wasteLogs]);
 
   function getBadgeCount(tabId: TabId): number {
@@ -159,7 +163,7 @@ function MainApp() {
                 <t.Icon size={14} strokeWidth={isActive ? 2.5 : 2} />
                 <span>{t.label}</span>
                 {badgeCount > 0 && (
-                  <span style={{ ...S.badge, backgroundColor: t.id === 'kds' ? '#F59E0B' : t.id === 'inventory' ? '#EF4444' : '#6366F1' }}>
+                  <span style={{ ...S.badge, backgroundColor: t.id === 'kds' ? (kdsHasUrgent ? '#EF4444' : '#F59E0B') : t.id === 'inventory' ? '#EF4444' : '#6366F1' }}>
                     {badgeCount}
                   </span>
                 )}

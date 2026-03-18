@@ -44,12 +44,12 @@ export default function InventoryScreen() {
             <details key={item.id} style={styles.row}>
               <summary style={{ ...styles.rowSummary, backgroundColor: isLow ? 'var(--danger-bg)' : 'var(--bg-card)' }}>
                 <span style={{ ...styles.td, flex: 2, fontWeight: 600 }}>{item.name}</span>
-                <span style={{ ...styles.td, fontWeight: 700, color: isLow ? '#EF4444' : '#FAFAFA' }}>
+                <span style={{ ...styles.td, fontWeight: 700, color: isLow ? '#EF4444' : 'var(--text-primary)' }}>
                   {item.stock.toFixed(item.unit === 'pz' ? 0 : 1)} {item.unit}
                 </span>
                 <span style={styles.td}>{item.minimumStock} {item.unit}</span>
                 <span style={styles.td}>{activeBatches.length}</span>
-                <span style={{ ...styles.td, color: expiryDays !== null && expiryDays <= 3 ? '#EF4444' : '#A1A1AA' }}>
+                <span style={{ ...styles.td, color: expiryDays !== null && expiryDays <= 3 ? '#EF4444' : 'var(--text-muted)' }}>
                   {expiryDays !== null ? `${expiryDays} dias` : '—'}
                 </span>
                 <span style={{ ...styles.td, flex: 0.5 }}>
