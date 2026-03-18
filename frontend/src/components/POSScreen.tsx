@@ -38,7 +38,7 @@ function ProductGrid() {
   const cat = categories.find((c) => c.id === selectedCategory);
 
   return (
-    <div style={S.grid}>
+    <div style={S.grid} data-product-grid>
       {filtered.map((p) => (
         <button key={p.id} data-product="true" onClick={() => openModifierSheet(p)}
           style={{ ...S.productCard, borderLeft: `3px solid ${cat?.color || '#10B981'}` }}>
@@ -384,8 +384,8 @@ function CartPanel() {
 
 export default function POSScreen() {
   return (
-    <div style={S.posLayout}>
-      <div style={S.menuSide}>
+    <div style={S.posLayout} data-pos-layout>
+      <div style={S.menuSide} data-pos-menu>
         <CategoryTabs />
         <ProductGrid />
       </div>
@@ -415,7 +415,7 @@ const S: Record<string, React.CSSProperties> = {
   productPrice: { fontWeight: 600, fontSize: 15, color: 'var(--text-faint)', marginTop: 6, fontVariantNumeric: 'tabular-nums' },
 
   cartPanel: {
-    width: '25%', flex: '0 0 25%',
+    width: '25%', flex: '0 0 25%', minWidth: 240,
     backgroundColor: 'var(--bg-secondary)',
     borderLeft: '1px solid var(--border)',
     display: 'flex', flexDirection: 'column', height: '100%',

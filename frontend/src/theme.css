@@ -187,3 +187,57 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   from { opacity: 0; transform: translateY(12px); }
   to { opacity: 1; transform: translateY(0); }
 }
+
+/* ─── Responsive Breakpoints ─────────────────────────────────────────── */
+
+/* Tablets and small screens (<1024px) */
+@media (max-width: 1024px) {
+  /* Navbar: stack items, smaller text */
+  header nav { gap: 0 !important; }
+  header nav button { padding: 6px 10px !important; font-size: 12px !important; }
+  header nav button span { display: none; } /* Hide text labels on tabs */
+
+  /* POS: stack vertically on tablet */
+  [data-pos-layout] {
+    flex-direction: column !important;
+  }
+  [data-pos-menu] {
+    width: 100% !important; flex: 1 !important; min-height: 50vh;
+  }
+  [data-pos-cart] {
+    width: 100% !important; flex: none !important;
+    height: 40vh; border-left: none !important; border-top: 1px solid var(--border) !important;
+  }
+
+  /* KDS: single column on tablet */
+  [data-kds-dual] { flex-direction: column !important; }
+  [data-kds-dual] > div { border-right: none !important; border-bottom: 1px solid var(--border); }
+
+  /* User pill: hide name */
+  [data-user-pill] span:nth-child(2) { display: none; }
+
+  /* Analytics KPI: 3 columns */
+  [data-kpi-row] { grid-template-columns: repeat(3, 1fr) !important; }
+}
+
+/* Mobile phones (<768px) */
+@media (max-width: 768px) {
+  header { padding: 0 10px !important; height: 48px !important; gap: 8px !important; }
+  header nav button { padding: 5px 8px !important; font-size: 11px !important; }
+
+  /* Product grid: 1 column */
+  [data-product-grid] { grid-template-columns: 1fr !important; }
+
+  /* Analytics KPI: 2 columns */
+  [data-kpi-row] { grid-template-columns: repeat(2, 1fr) !important; }
+
+  /* Admin forms: stack */
+  [data-admin-form] { flex-direction: column !important; }
+  [data-admin-grid] { grid-template-columns: 1fr !important; }
+}
+
+/* Large screens / TV (>1920px) */
+@media (min-width: 1920px) {
+  [data-product-grid] { grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)) !important; }
+  [data-kds-grid] { grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)) !important; }
+}

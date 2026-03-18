@@ -269,7 +269,7 @@ export default function KDSScreen() {
         </div>
       ) : (
         /* ─── Dual Station Live View ─── */
-        <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+        <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }} data-kds-dual>
           <StationPanel station="bar" title="Barra" color="#B45309"
             items={activeBar} now={now} userRole={userRole} operatorType={operatorType}
             onMarkReady={handleMarkReady} onMarkDelivered={handleMarkDelivered} />

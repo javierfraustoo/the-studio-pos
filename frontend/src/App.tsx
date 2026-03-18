@@ -173,7 +173,7 @@ function MainApp() {
         </nav>
 
         <div style={S.headerRight}>
-          <div style={S.userPill}>
+          <div style={S.userPill} data-user-pill>
             <div style={S.userAvatar}>{currentUser?.name?.charAt(0) || 'U'}</div>
             <span style={S.userName}>{currentUser?.name}</span>
             <span style={S.userRole}>{roleLabel}</span>

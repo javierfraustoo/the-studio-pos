@@ -533,28 +533,55 @@ function InventoryManager() {
 // ─── Users Manager ─────────────────────────────────────────────────────────
 
 function UsersManager() {
-  const [users, setUsers] = useState<Array<{ id: string; name: string; role: string; operator_type?: string | null; is_active: number }>>([]);
-  const [form, setForm] = useState({ name: '', pin: '', role: 'operador', operatorType: 'cajero' as string });
+  type UserRow = { id: string; name: string; role: string; operator_type?: string | null; is_active: number };
+  const [users, setUsers] = useState<UserRow[]>([]);
+  const [form, setForm] = useState({ name: '', pin: '', role: 'operador', operatorType: 'cajero' });
   const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [showPin, setShowPin] = useState(false);
+  const [deleting, setDeleting] = useState<string | null>(null);
 
   const load = async () => { setUsers(await api.fetchUsers()); };
   useEffect(() => { load(); }, []);
 
-  const handleSave = async () => {
-    if (!form.name || form.pin.length !== 6) return;
-    const payload: any = { name: form.name, pin: form.pin, role: form.role };
-    if (form.role === 'operador') payload.operatorType = form.operatorType;
-    await api.createUser(payload);
-    await load();
-    setShowForm(false); setForm({ name: '', pin: '', role: 'operador', operatorType: 'cajero' });
+  const resetForm = () => { setForm({ name: '', pin: '', role: 'operador', operatorType: 'cajero' }); setEditingId(null); setShowForm(false); setShowPin(false); };
+
+  const startEdit = (u: UserRow) => {
+    setForm({ name: u.name, pin: '', role: u.role, operatorType: u.operator_type || 'cajero' });
+    setEditingId(u.id);
+    setShowForm(true);
+    setShowPin(false);
   };
 
-  const toggleActive = async (u: typeof users[0]) => {
+  const handleSave = async () => {
+    if (!form.name) return;
+    if (!editingId && form.pin.length !== 6) return;
+    if (editingId) {
+      const payload: any = { name: form.name, role: form.role };
+      if (form.role === 'operador') payload.operatorType = form.operatorType;
+      if (form.pin.length === 6) payload.pin = form.pin;
+      await api.updateUser(editingId, payload);
+    } else {
+      if (form.pin.length !== 6) return;
+      const payload: any = { name: form.name, pin: form.pin, role: form.role };
+      if (form.role === 'operador') payload.operatorType = form.operatorType;
+      await api.createUser(payload);
+    }
+    await load();
+    resetForm();
+  };
+
+  const handleDelete = async (id: string) => {
+    try { await api.deleteUser(id); await load(); } catch (e: any) { alert(e.message); }
+    setDeleting(null);
+  };
+
+  const toggleActive = async (u: UserRow) => {
     await api.updateUser(u.id, { isActive: !u.is_active });
     await load();
   };
 
-  const roleLabel = (u: typeof users[0]) => {
+  const roleLabel = (u: UserRow) => {
     if (u.role === 'admin') return 'Administrador';
     if (u.role === 'supervisor') return 'Supervisor';
     if (u.role === 'operador') {
@@ -570,54 +597,84 @@ function UsersManager() {
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
         <h3 style={S.title}>Usuarios ({users.length})</h3>
-        <button onClick={() => setShowForm(true)} style={{ ...S.btn, ...S.btnPrimary }}>+ Nuevo Usuario</button>
+        <button onClick={() => { resetForm(); setShowForm(true); }} style={{ ...S.btn, ...S.btnPrimary }}>+ Nuevo Usuario</button>
       </div>
+
       {showForm && (
-        <div style={S.card}>
-          <div style={S.formRow}>
-            <div style={{ flex: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
-              <input placeholder="Nombre *" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} style={S.input} />
-              <Tooltip text="Nombre del empleado. Aparecera en tickets y auditoria."><span /></Tooltip>
+        <div style={{ ...S.card, marginBottom: 16 }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 12 }}>
+            {editingId ? 'Editar Usuario' : 'Nuevo Usuario'}
+          </div>
+          <div style={{ ...S.formRow, flexWrap: 'wrap' as const }} data-admin-form>
+            <div style={{ flex: '1 1 200px' }}>
+              <label style={{ fontSize: 11, color: 'var(--text-faint)', fontWeight: 600, display: 'block', marginBottom: 4 }}>Nombre</label>
+              <input placeholder="Nombre completo" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} style={S.input} />
             </div>
-            <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 2 }}>
-              <input placeholder="PIN 6 digitos *" maxLength={6} value={form.pin} onChange={e => setForm(f => ({ ...f, pin: e.target.value.replace(/\D/g, '') }))} style={S.input} />
-              <Tooltip text="PIN numerico de 6 digitos para login."><span /></Tooltip>
+            <div style={{ flex: '0 1 160px', position: 'relative' as const }}>
+              <label style={{ fontSize: 11, color: 'var(--text-faint)', fontWeight: 600, display: 'block', marginBottom: 4 }}>
+                PIN {editingId && '(dejar vacío para no cambiar)'}
+              </label>
+              <div style={{ position: 'relative' as const }}>
+                <input type={showPin ? 'text' : 'password'} placeholder="6 dígitos" maxLength={6}
+                  value={form.pin} onChange={e => setForm(f => ({ ...f, pin: e.target.value.replace(/\D/g, '') }))}
+                  style={{ ...S.input, paddingRight: 36 }} />
+                <button onClick={() => setShowPin(!showPin)} type="button"
+                  style={{ position: 'absolute' as const, right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--text-faint)', cursor: 'pointer', fontSize: 14, padding: 0 }}>
+                  {showPin ? '🙈' : '👁'}
+                </button>
+              </div>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <div style={{ flex: '0 1 140px' }}>
+              <label style={{ fontSize: 11, color: 'var(--text-faint)', fontWeight: 600, display: 'block', marginBottom: 4 }}>Rol</label>
               <select value={form.role} onChange={e => setForm(f => ({ ...f, role: e.target.value }))} style={S.select}>
-                <option value="admin">Admin</option>
+                <option value="admin">Administrador</option>
                 <option value="supervisor">Supervisor</option>
                 <option value="operador">Operador</option>
               </select>
-              <Tooltip text="Admin: acceso total. Supervisor: sin panel admin. Operador: segun tipo."><span /></Tooltip>
             </div>
             {form.role === 'operador' && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <div style={{ flex: '0 1 160px' }}>
+                <label style={{ fontSize: 11, color: 'var(--text-faint)', fontWeight: 600, display: 'block', marginBottom: 4 }}>Tipo</label>
                 <select value={form.operatorType} onChange={e => setForm(f => ({ ...f, operatorType: e.target.value }))} style={S.select}>
                   <option value="cajero">Cajero</option>
                   <option value="barista">Barista (KDS Barra)</option>
                   <option value="cocina">Cocina (KDS Cocina)</option>
                 </select>
-                <Tooltip text="Cajero: POS + Ordenes. Barista: auto-redirect KDS Barra. Cocina: auto-redirect KDS Cocina."><span /></Tooltip>
               </div>
             )}
           </div>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button onClick={handleSave} style={{ ...S.btn, ...S.btnPrimary }}>Crear</button>
-            <button onClick={() => setShowForm(false)} style={{ ...S.btn, ...S.btnSecondary }}>Cancelar</button>
+          <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+            <button onClick={handleSave} style={{ ...S.btn, ...S.btnPrimary }}>{editingId ? 'Guardar cambios' : 'Crear usuario'}</button>
+            <button onClick={resetForm} style={{ ...S.btn, ...S.btnSecondary }}>Cancelar</button>
           </div>
         </div>
       )}
-      <div style={S.grid}>
+
+      <div style={S.grid} data-admin-grid>
         {users.map(u => (
-          <div key={u.id} style={{ ...S.item, opacity: u.is_active ? 1 : 0.5 }}>
-            <div>
-              <div style={S.itemName}>{u.name}</div>
-              <div style={S.itemSub}>{roleLabel(u)} {!u.is_active && '(Inactivo)'}</div>
+          <div key={u.id} style={{ ...S.item, opacity: u.is_active ? 1 : 0.5, flexDirection: 'column' as const, alignItems: 'stretch', gap: 8 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <div style={S.itemName}>{u.name}</div>
+                <div style={S.itemSub}>{roleLabel(u)} {!u.is_active && '· Inactivo'}</div>
+              </div>
+              <div style={{ display: 'flex', gap: 4 }}>
+                <button onClick={() => startEdit(u)} style={{ ...S.btn, ...S.btnSecondary, padding: '4px 8px', fontSize: 11 }}>Editar</button>
+                <button onClick={() => toggleActive(u)} style={{ ...S.btn, padding: '4px 8px', fontSize: 11, backgroundColor: u.is_active ? 'var(--warning-bg)' : 'var(--success-bg)', color: u.is_active ? 'var(--warning)' : 'var(--success)', border: 'none' }}>
+                  {u.is_active ? 'Desactivar' : 'Activar'}
+                </button>
+                {u.role !== 'admin' && (
+                  deleting === u.id ? (
+                    <div style={{ display: 'flex', gap: 2 }}>
+                      <button onClick={() => handleDelete(u.id)} style={{ ...S.btn, ...S.btnDanger, padding: '4px 8px', fontSize: 10 }}>Confirmar</button>
+                      <button onClick={() => setDeleting(null)} style={{ ...S.btn, ...S.btnSecondary, padding: '4px 8px', fontSize: 10 }}>No</button>
+                    </div>
+                  ) : (
+                    <button onClick={() => setDeleting(u.id)} style={{ ...S.btn, ...S.btnDanger, padding: '4px 8px', fontSize: 11 }}>Eliminar</button>
+                  )
+                )}
+              </div>
             </div>
-            <button onClick={() => toggleActive(u)} style={{ ...S.btn, ...(u.is_active ? S.btnDanger : S.btnPrimary), padding: '4px 8px', fontSize: 11 }}>
-              {u.is_active ? 'Desactivar' : 'Activar'}
-            </button>
           </div>
         ))}
       </div>

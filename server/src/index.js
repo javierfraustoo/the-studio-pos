@@ -1164,6 +1164,17 @@ app.put('/api/admin/users/:id', requireRole('admin'), async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+app.delete('/api/admin/users/:id', requireRole('admin'), async (req, res) => {
+  try {
+    const { data: user } = await supabase.from('users').select('name, role').eq('id', req.params.id).single();
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    if (user.role === 'admin') return res.status(403).json({ error: 'Cannot delete admin users' });
+    await supabase.from('users').delete().eq('id', req.params.id);
+    await logAudit(req.user.id, req.user.name, 'user_deleted', 'user', req.params.id, { name: user.name });
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // ═══════════════════════════════════════════════════════════════════════════
 // MODIFIER RECIPE ADJUSTMENTS
 // ═══════════════════════════════════════════════════════════════════════════

@@ -322,3 +322,6 @@ export function createUser(data: { name: string; pin: string; role: string; oper
 export function updateUser(id: string, data: Partial<{ name: string; pin: string; role: string; operatorType: string; isActive: boolean }>) {
   return request<{ id: string; name: string; role: string; operator_type?: string }>(`/api/admin/users/${id}`, { method: 'PUT', body: JSON.stringify(data) });
 }
+export function deleteUser(id: string) {
+  return request<{ ok: boolean }>(`/api/admin/users/${id}`, { method: 'DELETE' });
+}
