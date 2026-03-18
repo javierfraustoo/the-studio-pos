@@ -80,7 +80,7 @@ export default function AnalyticsScreen() {
       {activeTab === 'dashboard' ? (
         <>
           {/* KPI Cards Row */}
-          <div style={styles.kpiRow}>
+          <div style={styles.kpiRow} data-kpi-row>
             <KpiCard label="Ventas totales" value={`$${revenue.toFixed(0)}`} color="#059669" />
             <KpiCard label="Ordenes" value={`${orderCount}`} color="#2563EB" />
             <KpiCard label="Ticket Promedio" value={`$${avgTicket.toFixed(0)}`} color="#7C3AED" sub="Venta total / Ordenes" />

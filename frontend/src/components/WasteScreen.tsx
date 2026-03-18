@@ -51,11 +51,12 @@ export default function WasteScreen() {
 
   return (
     <div style={styles.container}>
-      <h2 style={styles.title}>Registro de Merma</h2>
-      <p style={styles.subtitle}>Registra accidentes, caducidades y desperdicios</p>
-
       <div style={styles.formGrid}>
         <div style={styles.form}>
+          <div>
+            <h2 style={styles.title}>Registro de Merma</h2>
+            <p style={styles.subtitle}>Registra accidentes, caducidades y desperdicios</p>
+          </div>
           <div style={styles.field}>
             <label style={styles.label}>Tipo de merma</label>
             <div style={styles.toggleRow}>
@@ -151,11 +152,11 @@ export default function WasteScreen() {
 }
 
 const styles: Record<string, React.CSSProperties> = {
-  container: { padding: 24, height: '100%', overflowY: 'auto' },
+  container: { display: 'flex', height: '100%', width: '100%', overflow: 'hidden' },
   title: { fontSize: 22, fontWeight: 700, color: 'var(--text-primary)', margin: 0 },
   subtitle: { fontSize: 13, color: 'var(--text-faint)', margin: '4px 0 20px' },
-  formGrid: { display: 'flex', gap: 24 },
-  form: { flex: 1, display: 'flex', flexDirection: 'column', gap: 16 },
+  formGrid: { display: 'flex', height: '100%', width: '100%' },
+  form: { flex: 1, display: 'flex', flexDirection: 'column', gap: 16, padding: 24, overflowY: 'auto' },
   field: { display: 'flex', flexDirection: 'column', gap: 6 },
   label: { fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase' as const, letterSpacing: 0.5 },
   toggleRow: { display: 'flex', gap: 8 },
@@ -165,7 +166,7 @@ const styles: Record<string, React.CSSProperties> = {
   reasonGrid: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 },
   reasonBtn: { padding: '10px 8px', borderRadius: 10, border: '1.5px solid', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, fontWeight: 500, transition: 'all 0.15s' },
   submitBtn: { padding: '14px 0', borderRadius: 12, border: 'none', backgroundColor: 'var(--danger)', color: '#FFF', fontSize: 15, fontWeight: 700, cursor: 'pointer' },
-  logPanel: { width: 320, backgroundColor: 'var(--bg-card)', borderRadius: 16, border: '1px solid var(--border)', padding: 16, overflowY: 'auto', maxHeight: 500 },
+  logPanel: { width: '25%', minWidth: 260, maxWidth: 360, backgroundColor: 'var(--bg-secondary)', borderLeft: '1px solid var(--border)', padding: 16, overflowY: 'auto', flexShrink: 0 },
   logTitle: { fontSize: 14, fontWeight: 700, color: 'var(--text-primary)', margin: '0 0 12px' },
   logEmpty: { color: 'var(--text-faint)', fontSize: 13, textAlign: 'center', marginTop: 40 },
   logItem: { padding: '10px 0', borderBottom: '1px solid var(--border-light)' },

@@ -218,7 +218,7 @@ app.post('/api/inventory/receive', async (req, res) => {
 
 app.get('/api/orders', async (req, res) => {
   try {
-    const date = req.query.date || (() => { const n = new Date(); return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}`; })();
+    const date = req.query.date || (() => { const mx = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Mexico_City' })); return `${mx.getFullYear()}-${String(mx.getMonth()+1).padStart(2,'0')}-${String(mx.getDate()).padStart(2,'0')}`; })();
     const dayStart = `${date}T00:00:00-06:00`;
     const dayEnd = `${date}T23:59:59-06:00`;
 
@@ -284,7 +284,7 @@ app.post('/api/orders', async (req, res) => {
   if (!items || !items.length) return res.status(400).json({ error: 'No items' });
 
   try {
-    const today = (() => { const n = new Date(); return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}`; })();
+    const today = (() => { const mx = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Mexico_City' })); return `${mx.getFullYear()}-${String(mx.getMonth()+1).padStart(2,'0')}-${String(mx.getDate()).padStart(2,'0')}`; })();
     const dayStart = `${today}T00:00:00-06:00`;
     const dayEnd = `${today}T23:59:59-06:00`;
 
@@ -468,7 +468,7 @@ app.get('/api/kds/:station', async (req, res) => {
 app.get('/api/kds/:station/history', async (req, res) => {
   try {
     const { station } = req.params;
-    const date = req.query.date || (() => { const n = new Date(); return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}`; })();
+    const date = req.query.date || (() => { const mx = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Mexico_City' })); return `${mx.getFullYear()}-${String(mx.getMonth()+1).padStart(2,'0')}-${String(mx.getDate()).padStart(2,'0')}`; })();
     const dayStart = `${date}T00:00:00-06:00`;
     const dayEnd = `${date}T23:59:59-06:00`;
 
@@ -546,7 +546,7 @@ app.patch('/api/kds/:itemId', async (req, res) => {
 
 app.get('/api/waste', async (req, res) => {
   try {
-    const date = req.query.date || (() => { const n = new Date(); return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}`; })();
+    const date = req.query.date || (() => { const mx = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Mexico_City' })); return `${mx.getFullYear()}-${String(mx.getMonth()+1).padStart(2,'0')}-${String(mx.getDate()).padStart(2,'0')}`; })();
     const dayStart = `${date}T00:00:00-06:00`;
     const dayEnd = `${date}T23:59:59-06:00`;
 
