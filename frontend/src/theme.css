@@ -169,23 +169,12 @@ button[data-product]:hover {
 
 details summary:hover { background-color: var(--bg-hover) !important; }
 
-/* Focus ring — matches border-radius of element */
+/* Focus ring — uses box-shadow to follow border-radius (outlines don't) */
+button:focus, input:focus, select:focus { outline: none !important; }
 button:focus-visible, input:focus-visible, select:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-  border-radius: inherit;
+  outline: none !important;
+  box-shadow: 0 0 0 2px var(--bg-primary), 0 0 0 4px var(--accent) !important;
 }
-
-/* Remove default browser focus outline (the ugly square one) */
-button:focus:not(:focus-visible),
-input:focus:not(:focus-visible),
-select:focus:not(:focus-visible) {
-  outline: none;
-}
-
-/* Ensure all buttons have no default outline on click */
-button:focus { outline: none; }
-button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 ::selection { background-color: rgba(16,185,129,0.3); color: #FFFFFF; }
 

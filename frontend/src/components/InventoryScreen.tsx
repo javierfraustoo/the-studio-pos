@@ -134,7 +134,7 @@ const S: Record<string, React.CSSProperties> = {
   filterRow: { display: 'flex', gap: 6, marginBottom: 16, flexWrap: 'wrap' },
   filterBtn: { padding: '7px 14px', borderRadius: 10, cursor: 'pointer', fontWeight: 600, fontSize: 12, transition: 'all 0.2s' },
 
-  grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(380px, 1fr))', gap: 10 },
+  grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(380px, 1fr))', gap: 10, alignItems: 'start' },
   card: { borderRadius: 14, border: '1px solid var(--border)', backgroundColor: 'var(--bg-card)', overflow: 'hidden', transition: 'all 0.2s' },
   cardSummary: { display: 'flex', padding: '14px 16px', cursor: 'pointer', alignItems: 'center', gap: 12, transition: 'background 0.2s' },
   statusBadge: { padding: '3px 10px', borderRadius: 6, fontSize: 10, fontWeight: 700, flexShrink: 0 },

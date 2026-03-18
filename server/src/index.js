@@ -620,9 +620,9 @@ app.post('/api/waste', async (req, res) => {
 
 app.get('/api/analytics', async (req, res) => {
   try {
-    // Use local date from client or server local time
-    const now = new Date();
-    const localDate = req.query.date || `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+    // Use Mexico City timezone for "today"
+    const mx = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Mexico_City' }));
+    const localDate = req.query.date || `${mx.getFullYear()}-${String(mx.getMonth()+1).padStart(2,'0')}-${String(mx.getDate()).padStart(2,'0')}`;
     const dayStart = `${localDate}T00:00:00-06:00`;
     const dayEnd = `${localDate}T23:59:59-06:00`;
 
@@ -715,8 +715,8 @@ app.get('/api/analytics', async (req, res) => {
 
 app.get('/api/analytics/orders', requireRole('admin', 'supervisor'), async (req, res) => {
   try {
-    const now = new Date();
-    const date = req.query.date || `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+    const mx = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Mexico_City' }));
+    const date = req.query.date || `${mx.getFullYear()}-${String(mx.getMonth()+1).padStart(2,'0')}-${String(mx.getDate()).padStart(2,'0')}`;
     const dayStart = `${date}T00:00:00-06:00`;
     const dayEnd = `${date}T23:59:59-06:00`;
 

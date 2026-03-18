@@ -106,12 +106,12 @@ export default function OrdersScreen() {
 }
 
 const styles: Record<string, React.CSSProperties> = {
-  container: { padding: 24, overflowY: 'auto', height: '100%' },
-  title: { fontSize: 22, fontWeight: 700, color: 'var(--text-primary)', margin: 0 },
+  container: { padding: 24, overflowY: 'auto', height: '100%', width: '100%' },
+  title: { fontSize: 22, fontWeight: 700, color: 'var(--text-primary)', margin: 0, letterSpacing: '-0.02em' },
   subtitle: { fontSize: 13, color: 'var(--text-faint)', margin: '4px 0 20px' },
   empty: { color: 'var(--text-faint)', textAlign: 'center', marginTop: 80, fontSize: 14 },
 
-  chipGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 12 },
+  chipGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 12 },
   chip: {
     backgroundColor: 'var(--bg-card)', borderRadius: 12, border: '1px solid var(--border)', padding: 14,
     cursor: 'pointer', textAlign: 'left' as const, transition: 'all 0.2s ease',

@@ -107,7 +107,7 @@ function StationPanel({ station, title, color, items, now, userRole, operatorTyp
   const ready = items.filter(i => i.status === 'ready').length;
 
   return (
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', borderRight: '1px solid var(--border)', overflow: 'hidden' }}>
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', borderRight: '1px solid var(--border)', minWidth: 0, overflow: 'hidden' }}>
       <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ fontSize: 14, fontWeight: 700, color }}>● {title}</span>
@@ -117,13 +117,13 @@ function StationPanel({ station, title, color, items, now, userRole, operatorTyp
           <span style={{ fontSize: 11, color: 'var(--text-faint)' }}>{pending} pend. · {ready} listos</span>
         </div>
       </div>
-      <div style={{ flex: 1, overflowY: 'auto', padding: 10 }}>
+      <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: 12 }}>
         {items.length === 0 ? (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-faint)', fontSize: 13 }}>
             Sin órdenes
           </div>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 8, alignContent: 'start' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 10, alignContent: 'start' }}>
             {items.map(item => (
               <KdsItemCard key={item.id} item={item} now={now} userRole={userRole} operatorType={operatorType}
                 onMarkReady={onMarkReady} onMarkDelivered={onMarkDelivered} />
