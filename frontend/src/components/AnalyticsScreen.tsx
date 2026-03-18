@@ -52,7 +52,7 @@ export default function AnalyticsScreen() {
   if (!analytics) {
     return (
       <div style={styles.container}>
-        <h2 style={styles.title}>Analisis y Datos</h2>
+        <h2 style={styles.title}>Análisis y Datos</h2>
         <p style={styles.subtitle}>Cargando datos...</p>
       </div>
     );
@@ -62,7 +62,7 @@ export default function AnalyticsScreen() {
 
   return (
     <div style={styles.container}>
-      <h2 style={styles.title}>Analisis y Datos</h2>
+      <h2 style={styles.title}>Análisis y Datos</h2>
       <p style={styles.subtitle}>Inteligencia de negocio en tiempo real</p>
 
       {/* Tab bar */}
@@ -73,7 +73,7 @@ export default function AnalyticsScreen() {
         </button>
         <button onClick={() => setActiveTab('orders')}
           style={{ ...styles.tabBtn, backgroundColor: activeTab === 'orders' ? 'var(--accent)' : 'var(--bg-hover)', color: activeTab === 'orders' ? 'var(--accent-text)' : 'var(--text-secondary)' }}>
-          Detalle de Ordenes ({orderCount})
+          Detalle de Órdenes ({orderCount})
         </button>
       </div>
 
@@ -99,7 +99,7 @@ export default function AnalyticsScreen() {
 
             {/* Top 5 Most Profitable */}
             <div style={styles.card}>
-              <h3 style={styles.cardTitle}>Top 5 Mas Rentables</h3>
+              <h3 style={styles.cardTitle}>Top 5 Más Rentables</h3>
               <p style={{ fontSize: 11, color: 'var(--text-faint)', margin: '-8px 0 12px' }}>Por margen bruto, no por volumen</p>
               {top5Profitable && top5Profitable.length > 0 ? (
                 top5Profitable.map((p, i) => (
@@ -155,9 +155,9 @@ export default function AnalyticsScreen() {
             </div>
 
             <div style={styles.card}>
-              <h3 style={styles.cardTitle}>Productos Mas Vendidos</h3>
+              <h3 style={styles.cardTitle}>Productos Más Vendidos</h3>
               {topSellers.length === 0 ? (
-                <p style={styles.empty}>Procesa ordenes para ver datos</p>
+                <p style={styles.empty}>Procesa órdenes para ver datos</p>
               ) : (
                 topSellers.map((p, i) => (
                   <div key={p.product_id} style={styles.sellerRow}>
@@ -182,9 +182,9 @@ export default function AnalyticsScreen() {
       ) : (
         /* ─── Orders Detail Tab ─── */
         <div style={styles.card}>
-          <h3 style={styles.cardTitle}>Detalle de Ordenes del Dia</h3>
+          <h3 style={styles.cardTitle}>Detalle de Órdenes del Dia</h3>
           {orders.length === 0 ? (
-            <p style={styles.empty}>Sin ordenes hoy</p>
+            <p style={styles.empty}>Sin órdenes hoy</p>
           ) : (
             <div>
               {/* Table header */}

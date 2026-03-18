@@ -42,7 +42,7 @@ export default function InventoryScreen() {
 
           return (
             <details key={item.id} style={styles.row}>
-              <summary style={{ ...styles.rowSummary, backgroundColor: isLow ? '#FEF2F2' : '#FFF' }}>
+              <summary style={{ ...styles.rowSummary, backgroundColor: isLow ? 'var(--danger-bg)' : 'var(--bg-card)' }}>
                 <span style={{ ...styles.td, flex: 2, fontWeight: 600 }}>{item.name}</span>
                 <span style={{ ...styles.td, fontWeight: 700, color: isLow ? '#DC2626' : '#111827' }}>
                   {item.stock.toFixed(item.unit === 'pz' ? 0 : 1)} {item.unit}
@@ -103,15 +103,15 @@ export default function InventoryScreen() {
 const styles: Record<string, React.CSSProperties> = {
   container: { padding: 24, overflowY: 'auto', height: '100%' },
   header: { marginBottom: 20 },
-  title: { fontSize: 22, fontWeight: 700, color: '#111827', margin: 0 },
-  subtitle: { fontSize: 13, color: '#9CA3AF', margin: '4px 0 0' },
+  title: { fontSize: 22, fontWeight: 700, color: 'var(--text-primary)', margin: 0 },
+  subtitle: { fontSize: 13, color: 'var(--text-faint)', margin: '4px 0 0' },
   lowAlert: { color: '#DC2626', fontWeight: 600 },
   table: { display: 'flex', flexDirection: 'column', gap: 1 },
-  tableHeader: { display: 'flex', padding: '10px 16px', backgroundColor: '#F9FAFB', borderRadius: '8px 8px 0 0' },
-  th: { flex: 1, fontSize: 11, fontWeight: 700, color: '#6B7280', textTransform: 'uppercase' as const, letterSpacing: 0.5 },
-  row: { borderBottom: '1px solid #F3F4F6' },
-  rowSummary: { display: 'flex', padding: '12px 16px', cursor: 'pointer', alignItems: 'center', transition: 'background 0.15s' },
-  td: { flex: 1, fontSize: 13, color: '#374151' },
+  tableHeader: { display: 'flex', padding: '10px 16px', backgroundColor: 'var(--bg-hover)', borderRadius: '8px 8px 0 0' },
+  th: { flex: 1, fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' as const, letterSpacing: 0.5 },
+  row: { borderBottom: '1px solid var(--border-light)' },
+  rowSummary: { display: 'flex', padding: '12px 16px', cursor: 'pointer', alignItems: 'center', transition: 'background 0.2s' },
+  td: { flex: 1, fontSize: 13, color: 'var(--text-secondary)' },
   statusBadge: { padding: '2px 8px', borderRadius: 4, fontSize: 11, fontWeight: 700 },
   batchDetail: { padding: '0 16px 12px', marginLeft: 16, borderLeft: '3px solid #F59E0B' },
   batchHeader: { display: 'flex', padding: '8px 0', borderBottom: '1px solid #E5E7EB' },

@@ -130,3 +130,56 @@ body {
   background: var(--border);
   border-radius: 4px;
 }
+
+/* ─── Global Hover Micro-interactions ──────────────────────────────────── */
+
+/* Nav buttons hover glow */
+nav button:hover {
+  filter: brightness(1.1);
+  transform: translateY(-1px);
+}
+
+/* Product cards hover lift */
+button[style*="productCard"]:hover,
+details summary:hover {
+  box-shadow: 0 4px 12px var(--shadow);
+}
+
+/* Table rows hover highlight */
+details summary:hover {
+  background-color: var(--bg-hover) !important;
+}
+
+/* Generic button hover feedback */
+button {
+  transition: all 0.15s ease;
+}
+button:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+button:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+/* Card hover effects */
+[data-theme="light"] button:hover {
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+[data-theme="dark"] button:hover {
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+
+/* Scrollbar for both modes */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-faint);
+}

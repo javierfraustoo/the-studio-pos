@@ -3,6 +3,10 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { useStore } from './store/useStore';
 import type { TabId } from './store/useStore';
 import { subscribePosEvents, unsubscribe } from './realtime';
+import {
+  Sun, Moon, LayoutGrid, Monitor, ClipboardList, Package,
+  Trash2, BarChart3, Settings, LogOut, Cpu,
+} from 'lucide-react';
 
 import LoginScreen from './components/LoginScreen';
 import POSScreen from './components/POSScreen';
@@ -24,15 +28,15 @@ function DarkModeToggle() {
       onClick={toggleDarkMode}
       title={darkMode ? 'Modo Claro' : 'Modo Oscuro'}
       style={{
-        display: 'flex', alignItems: 'center', gap: 4,
-        padding: '5px 10px', borderRadius: 6,
-        border: `1px solid var(--border)`,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        width: 34, height: 34, borderRadius: 8,
+        border: '1px solid var(--border)',
         backgroundColor: 'transparent',
-        cursor: 'pointer', fontSize: 13, fontWeight: 600,
-        color: 'var(--text-muted)',
+        cursor: 'pointer', color: 'var(--text-muted)',
+        transition: 'all 0.2s ease',
       }}
     >
-      {darkMode ? '☀' : '🌙'}
+      {darkMode ? <Sun size={16} /> : <Moon size={16} />}
     </button>
   );
 }
@@ -45,29 +49,32 @@ function isKdsOnlyUser(user: { role: string; operator_type?: string | null }) {
 
 function canAccessTab(user: { role: string; operator_type?: string | null }, tabId: TabId): boolean {
   const { role, operator_type } = user;
-
-  // Admin: full access
   if (role === 'admin') return true;
-
-  // Supervisor: everything except admin panel
   if (role === 'supervisor') return tabId !== 'admin';
-
-  // Operador depends on operator_type
   if (role === 'operador') {
-    // Barista/Cocina: KDS + waste only (handled separately via redirect)
     if (operator_type === 'barista' || operator_type === 'cocina') {
       return tabId === 'kds' || tabId === 'waste';
     }
-    // Cajero: POS, orders, waste, KDS
     if (operator_type === 'cajero') {
       return ['pos', 'kds', 'orders', 'waste'].includes(tabId);
     }
   }
-
   return false;
 }
 
-// ─── Main POS App (tabbed) ──────────────────────────────────────────────────
+// ─── Tab config with Lucide Icons ───────────────────────────────────────
+
+const TAB_DEFS: Array<{ id: TabId; label: string; Icon: React.FC<any> }> = [
+  { id: 'pos', label: 'POS', Icon: LayoutGrid },
+  { id: 'kds', label: 'KDS', Icon: Monitor },
+  { id: 'orders', label: 'Órdenes', Icon: ClipboardList },
+  { id: 'inventory', label: 'Inventario', Icon: Package },
+  { id: 'waste', label: 'Merma', Icon: Trash2 },
+  { id: 'analytics', label: 'Análisis', Icon: BarChart3 },
+  { id: 'admin', label: 'Admin', Icon: Settings },
+];
+
+// ─── Main POS App ────────────────────────────────────────────────────────
 
 function MainApp() {
   const {
@@ -76,7 +83,6 @@ function MainApp() {
     isAuthenticated, currentUser, logout, reloadMenu, darkMode,
   } = useStore();
 
-  // Apply dark mode on mount and when toggled
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', darkMode ? 'dark' : 'light');
   }, [darkMode]);
@@ -85,7 +91,6 @@ function MainApp() {
     if (isAuthenticated) init();
   }, [isAuthenticated]);
 
-  // Supabase Realtime subscriptions (replaces Socket.io)
   useEffect(() => {
     const channel = subscribePosEvents({
       onOrderCreated: () => { fetchOrders(); fetchAnalytics(); },
@@ -93,18 +98,11 @@ function MainApp() {
       onMenuUpdated: () => { reloadMenu(); },
       onOrderComplete: () => { fetchOrders(); },
     });
-
-    return () => {
-      unsubscribe(channel);
-    };
+    return () => { unsubscribe(channel); };
   }, []);
 
-  // Not logged in → show login
-  if (!isAuthenticated) {
-    return <LoginScreen />;
-  }
+  if (!isAuthenticated) return <LoginScreen />;
 
-  // Barista/Cocina auto-redirect to their KDS
   if (currentUser && isKdsOnlyUser(currentUser)) {
     const station = currentUser.operator_type === 'barista' ? 'bar' : 'kitchen';
     const title = currentUser.operator_type === 'barista' ? 'KDS Barra' : 'KDS Cocina';
@@ -117,14 +115,11 @@ function MainApp() {
             <button onClick={logout} style={{ padding: '5px 12px', borderRadius: 6, border: '1px solid #FCA5A5', backgroundColor: 'transparent', color: '#FCA5A5', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Salir</button>
           </div>
         </div>
-        <div style={{ flex: 1 }}>
-          <KDSView station={station} title={title} />
-        </div>
+        <div style={{ flex: 1 }}><KDSView station={station} title={title} /></div>
       </div>
     );
   }
 
-  // Loading menu
   if (!menuLoaded) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', fontFamily: 'Inter, sans-serif', backgroundColor: 'var(--bg-primary)' }}>
@@ -136,26 +131,13 @@ function MainApp() {
     );
   }
 
-  // Role label for display
   const roleLabel = currentUser?.role === 'admin' ? 'Administrador'
     : currentUser?.role === 'supervisor' ? 'Supervisor'
     : currentUser?.operator_type === 'cajero' ? 'Cajero'
     : currentUser?.operator_type === 'barista' ? 'Barista'
-    : currentUser?.operator_type === 'cocina' ? 'Cocina'
-    : 'Operador';
+    : currentUser?.operator_type === 'cocina' ? 'Cocina' : 'Operador';
 
-  const tabs: Array<{ id: TabId; label: string; icon: string }> = [
-    { id: 'pos', label: 'POS', icon: '▢' },
-    { id: 'kds', label: 'KDS', icon: '📺' },
-    { id: 'orders', label: 'Ordenes', icon: '☰' },
-    { id: 'inventory', label: 'Inventario', icon: '⚙' },
-    { id: 'waste', label: 'Merma', icon: '🗑' },
-    { id: 'analytics', label: 'Analisis', icon: '📊' },
-    { id: 'admin', label: 'Admin', icon: '🔧' },
-  ];
-
-  const visibleTabs = currentUser ? tabs.filter(t => canAccessTab(currentUser, t.id)) : [];
-
+  const visibleTabs = currentUser ? TAB_DEFS.filter(t => canAccessTab(currentUser, t.id)) : [];
   const showHW = showSimulators && activeTab === 'pos';
 
   return (
@@ -165,36 +147,27 @@ function MainApp() {
           <span style={styles.diamond}>&#9670;</span>
           <span style={styles.brandName}>THE STUDIO</span>
           <span style={styles.posBadge}>POS</span>
-          <span style={styles.version}>v4</span>
         </div>
         <nav style={styles.nav}>
-          {visibleTabs.map((t) => (
-            <button
-              key={t.id}
-              onClick={() => setActiveTab(t.id)}
-              style={{
-                ...styles.navBtn,
-                backgroundColor: activeTab === t.id ? 'var(--accent)' : 'transparent',
-                color: activeTab === t.id ? 'var(--accent-text)' : 'var(--text-muted)',
-              }}
-            >
-              {t.icon} {t.label}
-              {t.id === 'orders' && orders.length > 0 && (
-                <span style={styles.badge}>{orders.length}</span>
-              )}
-            </button>
-          ))}
+          {visibleTabs.map((t) => {
+            const isActive = activeTab === t.id;
+            return (
+              <button key={t.id} onClick={() => setActiveTab(t.id)}
+                style={{ ...styles.navBtn, backgroundColor: isActive ? 'var(--accent)' : 'transparent', color: isActive ? 'var(--accent-text)' : 'var(--text-muted)' }}>
+                <t.Icon size={15} strokeWidth={2.2} />
+                <span>{t.label}</span>
+                {t.id === 'orders' && orders.length > 0 && <span style={styles.badge}>{orders.length}</span>}
+              </button>
+            );
+          })}
         </nav>
         <div style={styles.headerRight}>
           <span style={styles.userInfo}>{currentUser?.name} ({roleLabel})</span>
           <DarkModeToggle />
-          <button onClick={toggleSimulators} style={styles.hwToggle}>
-            {showSimulators ? 'Ocultar' : 'HW'}
-          </button>
-          <button onClick={logout} style={styles.logoutBtn}>Salir</button>
+          <button onClick={toggleSimulators} style={styles.hwToggle} title="Simuladores"><Cpu size={14} /></button>
+          <button onClick={logout} style={styles.logoutBtn}><LogOut size={14} /><span>Salir</span></button>
         </div>
       </header>
-
       <div style={styles.mainArea}>
         <div style={{ flex: 1, overflow: 'hidden', display: 'flex' }}>
           {activeTab === 'pos' && <POSScreen />}
@@ -205,11 +178,7 @@ function MainApp() {
           {activeTab === 'analytics' && <AnalyticsScreen />}
           {activeTab === 'admin' && <AdminScreen />}
         </div>
-        {showHW && (
-          <div style={{ height: 280, borderTop: '1px solid var(--border)', flexShrink: 0 }}>
-            <HardwareSimulators />
-          </div>
-        )}
+        {showHW && <div style={{ height: 280, borderTop: '1px solid var(--border)', flexShrink: 0 }}><HardwareSimulators /></div>}
       </div>
     </div>
   );
@@ -230,18 +199,17 @@ export default function App() {
 
 const styles: Record<string, React.CSSProperties> = {
   app: { height: '100vh', display: 'flex', flexDirection: 'column', fontFamily: "'Inter', system-ui, sans-serif", backgroundColor: 'var(--bg-primary)' },
-  header: { display: 'flex', alignItems: 'center', padding: '0 16px', height: 52, backgroundColor: 'var(--bg-header)', borderBottom: '1px solid var(--border)', gap: 12, flexShrink: 0 },
+  header: { display: 'flex', alignItems: 'center', padding: '0 20px', height: 56, backgroundColor: 'var(--bg-header)', borderBottom: '2px solid var(--border)', gap: 16, flexShrink: 0 },
   brand: { display: 'flex', alignItems: 'center', gap: 6 },
-  diamond: { fontSize: 18, color: '#78350F' },
-  brandName: { fontSize: 14, fontWeight: 800, color: 'var(--text-primary)', letterSpacing: 0.5 },
-  posBadge: { fontSize: 10, fontWeight: 700, backgroundColor: 'var(--accent)', color: 'var(--accent-text)', padding: '2px 6px', borderRadius: 4 },
-  version: { fontSize: 10, color: 'var(--text-faint)' },
-  nav: { display: 'flex', gap: 2, marginLeft: 8, flex: 1, flexWrap: 'wrap' },
-  navBtn: { padding: '6px 12px', borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: 13, display: 'flex', alignItems: 'center', gap: 4, transition: 'all 0.15s', position: 'relative' as const, whiteSpace: 'nowrap' as const },
-  badge: { fontSize: 10, fontWeight: 700, backgroundColor: '#EF4444', color: '#FFF', padding: '1px 5px', borderRadius: 8, marginLeft: 2 },
+  diamond: { fontSize: 20, color: '#B45309' },
+  brandName: { fontSize: 15, fontWeight: 800, color: 'var(--text-primary)', letterSpacing: 1 },
+  posBadge: { fontSize: 10, fontWeight: 700, backgroundColor: 'var(--accent)', color: 'var(--accent-text)', padding: '2px 7px', borderRadius: 4 },
+  nav: { display: 'flex', gap: 2, marginLeft: 12, flex: 1, flexWrap: 'wrap' },
+  navBtn: { padding: '8px 14px', borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: 13, display: 'flex', alignItems: 'center', gap: 6, transition: 'all 0.2s ease', position: 'relative' as const, whiteSpace: 'nowrap' as const },
+  badge: { fontSize: 10, fontWeight: 700, backgroundColor: '#EF4444', color: '#FFF', padding: '1px 6px', borderRadius: 8, marginLeft: 2 },
   headerRight: { display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 },
-  userInfo: { fontSize: 12, color: 'var(--text-muted)', fontWeight: 500 },
-  hwToggle: { padding: '5px 10px', borderRadius: 6, border: '1px solid var(--border)', backgroundColor: 'transparent', cursor: 'pointer', fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)' },
-  logoutBtn: { padding: '5px 10px', borderRadius: 6, border: '1px solid #FCA5A5', backgroundColor: 'transparent', cursor: 'pointer', fontSize: 11, fontWeight: 600, color: '#DC2626' },
+  userInfo: { fontSize: 13, color: 'var(--text-muted)', fontWeight: 500 },
+  hwToggle: { width: 34, height: 34, borderRadius: 8, border: '1px solid var(--border)', backgroundColor: 'transparent', cursor: 'pointer', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s ease' },
+  logoutBtn: { padding: '6px 12px', borderRadius: 8, border: '1px solid var(--danger)', backgroundColor: 'transparent', cursor: 'pointer', fontSize: 12, fontWeight: 600, color: 'var(--danger)', display: 'flex', alignItems: 'center', gap: 4, transition: 'all 0.2s ease' },
   mainArea: { flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' },
 };

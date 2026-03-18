@@ -12,10 +12,17 @@ function getSlaColor(minutes: number) {
 function useTimer() {
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), 5000);
+    const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
   }, []);
   return now;
+}
+
+function formatElapsed(ms: number): string {
+  const totalSec = Math.max(0, Math.floor(ms / 1000));
+  const mins = Math.floor(totalSec / 60);
+  const secs = totalSec % 60;
+  return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
 }
 
 // ─── Undo Toast ─────────────────────────────────────────────────────────────
@@ -71,7 +78,7 @@ function KdsItemCard({
           </span>
         </div>
         <div style={{ ...styles.kdsTimer, color: isReady ? '#3B82F6' : sla.border }}>
-          {isReady ? 'LISTO' : `${mins} min`}
+          {isReady ? 'LISTO' : formatElapsed(elapsed)}
         </div>
       </div>
 
@@ -269,7 +276,7 @@ export default function KDSScreen() {
       ) : stationItems.length === 0 ? (
         <div style={styles.kdsEmpty}>
           <span style={styles.kdsEmptyIcon}>{activeStation === 'bar' ? '\u2615' : '\u{1F373}'}</span>
-          <p>Sin ordenes pendientes en {activeStation === 'bar' ? 'barra' : 'cocina'}</p>
+          <p>Sin órdenes pendientes en {activeStation === 'bar' ? 'barra' : 'cocina'}</p>
         </div>
       ) : (
         <div style={styles.kdsGrid}>
@@ -298,22 +305,22 @@ const styles: Record<string, React.CSSProperties> = {
   slaLegend: { display: 'flex', gap: 16, marginBottom: 16, padding: '8px 12px', backgroundColor: '#F9FAFB', borderRadius: 8 },
   slaItem: { display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#6B7280' },
   slaBox: { width: 16, height: 16, borderRadius: 4, border: '2px solid' },
-  kdsGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16, flex: 1 },
-  kdsCard: { borderRadius: 16, border: '3px solid', padding: 16, display: 'flex', flexDirection: 'column', gap: 8, transition: 'all 0.3s ease' },
+  kdsGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 10, flex: 1 },
+  kdsCard: { borderRadius: 12, border: '3px solid', padding: 12, display: 'flex', flexDirection: 'column', gap: 4, transition: 'all 0.2s ease' },
   kdsCardHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
-  kdsOrderInfo: { display: 'flex', alignItems: 'center', gap: 8 },
-  kdsOrderNum: { fontSize: 22, fontWeight: 800, color: '#111827' },
-  kdsOrderType: { fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 4, backgroundColor: '#E5E7EB', color: '#374151' },
-  kdsTimer: { fontSize: 28, fontWeight: 800, fontFamily: 'monospace' },
-  kdsCustomer: { fontSize: 14, fontWeight: 600, color: '#374151', margin: 0 },
-  slaBadge: { alignSelf: 'flex-start', color: '#FFF', fontSize: 11, fontWeight: 800, padding: '3px 10px', borderRadius: 6, letterSpacing: 1 },
-  kdsProduct: { display: 'flex', gap: 8, alignItems: 'baseline' },
-  kdsQty: { fontSize: 20, fontWeight: 800, color: '#1F2937' },
-  kdsName: { fontSize: 18, fontWeight: 700, color: '#1F2937' },
-  kdsModifiers: { display: 'flex', flexWrap: 'wrap', gap: 4 },
-  kdsModTag: { fontSize: 12, backgroundColor: 'rgba(0,0,0,0.08)', padding: '3px 8px', borderRadius: 6, fontWeight: 600, color: '#374151' },
-  kdsNotes: { fontSize: 13, color: '#D97706', fontStyle: 'italic', fontWeight: 600, margin: 0, padding: '4px 8px', backgroundColor: '#FFFBEB', borderRadius: 6 },
-  kdsActionBtn: { width: '100%', padding: '14px 0', borderRadius: 12, border: 'none', color: '#FFF', fontSize: 16, fontWeight: 800, cursor: 'pointer', letterSpacing: 1, marginTop: 4 },
+  kdsOrderInfo: { display: 'flex', alignItems: 'center', gap: 6 },
+  kdsOrderNum: { fontSize: 18, fontWeight: 800, color: '#111827' },
+  kdsOrderType: { fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 4, backgroundColor: '#E5E7EB', color: '#374151' },
+  kdsTimer: { fontSize: 22, fontWeight: 800, fontFamily: 'monospace' },
+  kdsCustomer: { fontSize: 12, fontWeight: 600, color: '#374151', margin: 0 },
+  slaBadge: { alignSelf: 'flex-start', color: '#FFF', fontSize: 10, fontWeight: 800, padding: '2px 8px', borderRadius: 4, letterSpacing: 1 },
+  kdsProduct: { display: 'flex', gap: 6, alignItems: 'baseline' },
+  kdsQty: { fontSize: 16, fontWeight: 800, color: '#1F2937' },
+  kdsName: { fontSize: 15, fontWeight: 700, color: '#1F2937' },
+  kdsModifiers: { display: 'flex', flexWrap: 'wrap', gap: 3 },
+  kdsModTag: { fontSize: 11, backgroundColor: 'rgba(0,0,0,0.08)', padding: '2px 6px', borderRadius: 4, fontWeight: 600, color: '#374151' },
+  kdsNotes: { fontSize: 12, color: '#D97706', fontStyle: 'italic', fontWeight: 600, margin: 0, padding: '3px 6px', backgroundColor: '#FFFBEB', borderRadius: 4 },
+  kdsActionBtn: { width: '100%', padding: '10px 0', borderRadius: 8, border: 'none', color: '#FFF', fontSize: 14, fontWeight: 800, cursor: 'pointer', letterSpacing: 1, marginTop: 2, transition: 'opacity 0.2s' },
   kdsEmpty: { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#9CA3AF' },
   kdsEmptyIcon: { fontSize: 48, marginBottom: 12 },
 };

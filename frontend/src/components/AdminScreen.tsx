@@ -920,10 +920,10 @@ function AuditViewer() {
 
   const actionLabel = (a: string) => {
     const map: Record<string, string> = {
-      login: 'Inicio sesion', login_failed: 'Login fallido',
+      login: 'Inicio sesión', login_failed: 'Login fallido',
       order_created: 'Orden creada', waste_registered: 'Merma registrada',
       product_created: 'Producto creado', product_updated: 'Producto editado', product_deleted: 'Producto eliminado',
-      category_created: 'Categoria creada', category_updated: 'Categoria editada', category_deleted: 'Categoria eliminada',
+      category_created: 'Categoría creada', category_updated: 'Categoría editada', category_deleted: 'Categoría eliminada',
       inventory_received: 'Inventario recibido', inventory_item_created: 'Insumo creado', inventory_item_updated: 'Insumo editado',
       user_created: 'Usuario creado', user_updated: 'Usuario editado',
       recipe_updated: 'Receta editada', modifier_group_created: 'Grupo mod. creado',
@@ -948,7 +948,7 @@ function AuditViewer() {
     { value: 'order_created', label: 'Ordenes creadas' },
     { value: 'order_cancelled', label: 'Ordenes canceladas' },
     { value: 'waste_registered', label: 'Mermas registradas' },
-    { value: 'login', label: 'Inicios de sesion' },
+    { value: 'login', label: 'Inicios de sesión' },
     { value: 'login_failed', label: 'Logins fallidos' },
     { value: 'override_authorized', label: 'Override autorizado' },
     { value: 'override_denied', label: 'Override denegado' },
@@ -968,7 +968,7 @@ function AuditViewer() {
 
   return (
     <div>
-      <h3 style={S.title}>Registro de Auditoria ({total} registros)</h3>
+      <h3 style={S.title}>Registro de Auditoría ({total} registros)</h3>
       <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
         <select value={filterRole} onChange={e => setFilterRole(e.target.value)} style={{ ...S.select, minWidth: 160 }}>
           {ROLES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
@@ -997,7 +997,7 @@ function AuditViewer() {
             <tr style={{ backgroundColor: 'var(--bg-hover)' }}>
               <th style={thStyle}>Fecha</th>
               <th style={thStyle}>Usuario</th>
-              <th style={thStyle}>Accion</th>
+              <th style={thStyle}>Acción</th>
               <th style={thStyle}>Entidad</th>
               <th style={thStyle}>Detalles</th>
             </tr>
