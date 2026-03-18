@@ -208,8 +208,17 @@ function CartPanel() {
   const [showDiscountInput, setShowDiscountInput] = useState(false);
   const [showOverride, setShowOverride] = useState(false);
   const [pendingDiscount, setPendingDiscount] = useState(0);
+  // Per-item discounts: cartItemId → { percent, authorizer }
+  const [itemDiscounts, setItemDiscounts] = useState<Record<string, { percent: number; authorizer: string }>>({});
+  const [editingItemDiscount, setEditingItemDiscount] = useState<string | null>(null);
+  const [pendingItemDiscount, setPendingItemDiscount] = useState(0);
+  const [showItemOverride, setShowItemOverride] = useState(false);
 
-  const subtotal = cartSubtotal();
+  const subtotal = cart.reduce((s, item) => {
+    const disc = itemDiscounts[item.cartItemId];
+    const itemTotal = disc ? item.lineTotal * (1 - disc.percent / 100) : item.lineTotal;
+    return s + itemTotal;
+  }, 0);
   const discountAmount = subtotal * (discountPercent / 100);
   const total = subtotal - discountAmount;
 
@@ -230,7 +239,7 @@ function CartPanel() {
           <h2 style={{ fontSize: 24, fontWeight: 800, margin: 0, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>Orden #{lastOrder.orderNumber}</h2>
           <p style={{ fontSize: 14, color: 'var(--text-muted)', margin: '6px 0 0' }}>{lastOrder.paymentMethod === 'cash' ? 'Efectivo' : 'Tarjeta'} — ${lastOrder.total.toFixed(2)}</p>
           <p style={{ fontSize: 11, color: 'var(--text-faint)', marginTop: 8 }}>Enviado a KDS</p>
-          <button onClick={() => { setLastOrder(null); setDiscountPercent(0); setDiscountAuthorizer(''); setPendingDiscount(0); setShowDiscountInput(false); setCustomerName(''); }} style={{ ...S.checkoutBtn, marginTop: 24, width: '80%' }}>Nueva orden</button>
+          <button onClick={() => { setLastOrder(null); setDiscountPercent(0); setDiscountAuthorizer(''); setPendingDiscount(0); setShowDiscountInput(false); setCustomerName(''); setItemDiscounts({}); }} style={{ ...S.checkoutBtn, marginTop: 24, width: '80%' }}>Nueva orden</button>
         </div>
       </div>
     );
@@ -272,11 +281,11 @@ function CartPanel() {
       </div>
       <div style={{ padding: '8px 16px', display: 'flex', gap: 4 }}>
         <button onClick={() => setOrderType('dine_in')}
-          style={{ ...S.typeBtn, backgroundColor: orderType === 'dine_in' ? 'rgba(16,185,129,0.12)' : 'rgba(255,255,255,0.03)', color: orderType === 'dine_in' ? '#10B981' : '#71717A', border: `1px solid ${orderType === 'dine_in' ? 'rgba(16,185,129,0.25)' : 'rgba(255,255,255,0.06)'}` }}>
+          style={{ ...S.typeBtn, backgroundColor: orderType === 'dine_in' ? 'var(--accent-glow)' : 'var(--bg-hover)', color: orderType === 'dine_in' ? 'var(--accent)' : 'var(--text-muted)', border: `1px solid ${orderType === 'dine_in' ? 'rgba(16,185,129,0.25)' : 'var(--border)'}` }}>
           Aquí
         </button>
         <button onClick={() => setOrderType('to_go')}
-          style={{ ...S.typeBtn, backgroundColor: orderType === 'to_go' ? 'rgba(16,185,129,0.12)' : 'rgba(255,255,255,0.03)', color: orderType === 'to_go' ? '#10B981' : '#71717A', border: `1px solid ${orderType === 'to_go' ? 'rgba(16,185,129,0.25)' : 'rgba(255,255,255,0.06)'}` }}>
+          style={{ ...S.typeBtn, backgroundColor: orderType === 'to_go' ? 'var(--accent-glow)' : 'var(--bg-hover)', color: orderType === 'to_go' ? 'var(--accent)' : 'var(--text-muted)', border: `1px solid ${orderType === 'to_go' ? 'rgba(16,185,129,0.25)' : 'var(--border)'}` }}>
           Llevar
         </button>
       </div>
@@ -285,22 +294,47 @@ function CartPanel() {
       <div style={{ flex: 1, overflowY: 'auto', padding: '0 16px' }}>
         {cart.length === 0 ? (
           <p style={{ color: 'var(--text-faint)', textAlign: 'center', marginTop: 40, fontSize: 13 }}>Agrega productos</p>
-        ) : cart.map((item) => (
-          <div key={item.cartItemId} style={{ padding: '10px 0', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ fontWeight: 600, fontSize: 13, color: 'var(--text-primary)' }}>{item.product.name}</span>
-              <span style={{ fontWeight: 600, fontSize: 13, color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>${item.lineTotal}</span>
+        ) : cart.map((item) => {
+          const iDisc = itemDiscounts[item.cartItemId];
+          const itemFinal = iDisc ? item.lineTotal * (1 - iDisc.percent / 100) : item.lineTotal;
+          return (
+            <div key={item.cartItemId} style={{ padding: '10px 0', borderBottom: '1px solid var(--border-light)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ fontWeight: 600, fontSize: 13, color: 'var(--text-primary)' }}>{item.product.name}</span>
+                <span style={{ fontWeight: 600, fontSize: 13, color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>
+                  {iDisc ? <><span style={{ textDecoration: 'line-through', color: 'var(--text-faint)', marginRight: 4, fontSize: 11 }}>${item.lineTotal}</span>${itemFinal.toFixed(0)}</> : `$${item.lineTotal}`}
+                </span>
+              </div>
+              {iDisc && <div style={{ fontSize: 10, color: '#10B981', fontWeight: 600 }}>-{iDisc.percent}% desc.</div>}
+              {item.modifiers.length > 0 && <div style={{ display: 'flex', gap: 4, marginTop: 4, flexWrap: 'wrap' }}>{item.modifiers.map((m) => <span key={m.id} style={S.modTag}>{m.shortName}{m.priceAdjustment > 0 ? ` +$${m.priceAdjustment}` : ''}</span>)}</div>}
+              {item.notes && <p style={{ fontSize: 11, color: '#F59E0B', margin: '4px 0 0', fontStyle: 'italic' }}>{item.notes}</p>}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
+                <button onClick={() => updateQuantity(item.cartItemId, -1)} style={S.qtyBtn}>−</button>
+                <span style={{ fontWeight: 600, fontSize: 13, minWidth: 18, textAlign: 'center', color: 'var(--text-primary)' }}>{item.quantity}</span>
+                <button onClick={() => updateQuantity(item.cartItemId, 1)} style={S.qtyBtn}>+</button>
+                {iDisc ? (
+                  <button onClick={() => { const copy = { ...itemDiscounts }; delete copy[item.cartItemId]; setItemDiscounts(copy); }}
+                    style={{ marginLeft: 'auto', fontSize: 10, color: '#10B981', background: 'none', border: 'none', cursor: 'pointer' }}>✕ desc.</button>
+                ) : (
+                  <button onClick={() => { setEditingItemDiscount(item.cartItemId); setPendingItemDiscount(0); }}
+                    style={{ marginLeft: 'auto', fontSize: 10, color: 'var(--text-faint)', background: 'none', border: 'none', cursor: 'pointer' }}>% desc.</button>
+                )}
+                <button onClick={() => removeFromCart(item.cartItemId)} style={{ fontSize: 11, color: '#EF4444', background: 'none', border: 'none', cursor: 'pointer', opacity: 0.7 }}>Quitar</button>
+              </div>
+              {editingItemDiscount === item.cartItemId && (
+                <div style={{ display: 'flex', gap: 4, marginTop: 6, alignItems: 'center' }}>
+                  <input type="number" min="1" max="100" placeholder="%" value={pendingItemDiscount || ''} autoFocus
+                    onChange={e => setPendingItemDiscount(Math.min(100, Math.max(0, Number(e.target.value))))}
+                    style={{ width: 50, padding: '4px 6px', borderRadius: 6, border: '1px solid var(--border)', fontSize: 12, backgroundColor: 'var(--bg-input)', color: 'var(--text-primary)', textAlign: 'center' }} />
+                  <button onClick={() => { if (pendingItemDiscount > 0) setShowItemOverride(true); }}
+                    disabled={!pendingItemDiscount} style={{ padding: '4px 10px', borderRadius: 6, border: 'none', background: '#10B981', color: '#FFF', fontWeight: 700, fontSize: 10, cursor: 'pointer', opacity: pendingItemDiscount > 0 ? 1 : 0.4 }}>Autorizar</button>
+                  <button onClick={() => setEditingItemDiscount(null)}
+                    style={{ padding: '4px 6px', borderRadius: 6, border: '1px solid var(--border)', background: 'none', color: 'var(--text-faint)', fontSize: 10, cursor: 'pointer' }}>✕</button>
+                </div>
+              )}
             </div>
-            {item.modifiers.length > 0 && <div style={{ display: 'flex', gap: 4, marginTop: 4, flexWrap: 'wrap' }}>{item.modifiers.map((m) => <span key={m.id} style={S.modTag}>{m.shortName}{m.priceAdjustment > 0 ? ` +$${m.priceAdjustment}` : ''}</span>)}</div>}
-            {item.notes && <p style={{ fontSize: 11, color: '#F59E0B', margin: '4px 0 0', fontStyle: 'italic' }}>{item.notes}</p>}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
-              <button onClick={() => updateQuantity(item.cartItemId, -1)} style={S.qtyBtn}>−</button>
-              <span style={{ fontWeight: 600, fontSize: 13, minWidth: 18, textAlign: 'center', color: 'var(--text-primary)' }}>{item.quantity}</span>
-              <button onClick={() => updateQuantity(item.cartItemId, 1)} style={S.qtyBtn}>+</button>
-              <button onClick={() => removeFromCart(item.cartItemId)} style={{ marginLeft: 'auto', fontSize: 11, color: '#EF4444', background: 'none', border: 'none', cursor: 'pointer', opacity: 0.7 }}>Quitar</button>
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {cart.length > 0 && (
@@ -375,6 +409,22 @@ function CartPanel() {
         requestedBy="cajero"
         onAuthorized={(overrideUser) => { setDiscountPercent(pendingDiscount); setDiscountAuthorizer(overrideUser?.name || ''); setShowDiscountInput(false); setShowOverride(false); }}
         onCancel={() => setShowOverride(false)}
+      />
+
+      {/* Per-item discount authorization */}
+      <OverrideModal
+        isOpen={showItemOverride}
+        action="item_discount"
+        actionLabel={`Autorizar ${pendingItemDiscount}% desc. en producto`}
+        requestedBy="cajero"
+        onAuthorized={(overrideUser) => {
+          if (editingItemDiscount) {
+            setItemDiscounts(prev => ({ ...prev, [editingItemDiscount]: { percent: pendingItemDiscount, authorizer: overrideUser?.name || '' } }));
+          }
+          setEditingItemDiscount(null);
+          setShowItemOverride(false);
+        }}
+        onCancel={() => setShowItemOverride(false)}
       />
     </div>
   );

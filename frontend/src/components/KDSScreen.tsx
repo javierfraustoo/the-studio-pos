@@ -107,7 +107,7 @@ function StationPanel({ station, title, color, items, now, userRole, operatorTyp
   const ready = items.filter(i => i.status === 'ready').length;
 
   return (
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', borderRight: '1px solid var(--border)', minWidth: 0, overflow: 'hidden' }}>
+    <div style={{ flex: '1 1 50%', display: 'flex', flexDirection: 'column', borderRight: '1px solid var(--border)', minWidth: 0, overflow: 'hidden' }}>
       <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ fontSize: 14, fontWeight: 700, color }}>● {title}</span>

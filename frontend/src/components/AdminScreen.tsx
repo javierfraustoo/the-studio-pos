@@ -512,16 +512,19 @@ function InventoryManager() {
           </div>
         </div>
       )}
-      <div style={S.grid}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 10 }}>
         {inventory.map(inv => (
-          <div key={inv.id} style={{ ...S.item, borderLeft: `4px solid ${inv.stock < inv.minimumStock ? '#EF4444' : '#10B981'}` }}>
-            <div>
-              <div style={S.itemName}>{inv.name}</div>
-              <div style={S.itemSub}>Stock: {inv.stock} {inv.unit} | Min: {inv.minimumStock} {inv.unit}</div>
-            </div>
-            <div style={{ display: 'flex', gap: 4 }}>
-              <button onClick={() => setReceiveFor(inv.id)} style={{ ...S.btn, ...S.btnPrimary, padding: '4px 8px', fontSize: 11 }}>+Lote</button>
-              <button onClick={() => { setForm({ name: inv.name, unit: inv.unit, isPerishable: inv.isPerishable, minimumStock: String(inv.minimumStock) }); setEditId(inv.id); setShowForm(true); }} style={{ ...S.btn, ...S.btnSecondary, padding: '4px 8px', fontSize: 11 }}>Editar</button>
+          <div key={inv.id} style={{ ...S.item, borderLeft: `4px solid ${inv.stock < inv.minimumStock ? '#EF4444' : '#10B981'}`, flexDirection: 'column' as const, gap: 8, alignItems: 'stretch' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <div style={S.itemName}>{inv.name}</div>
+                <div style={S.itemSub}>Stock: {inv.stock.toFixed(inv.unit === 'pz' ? 0 : 1)} {inv.unit} | Mín: {inv.minimumStock} {inv.unit}</div>
+              </div>
+              <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+                <button onClick={() => setReceiveFor(inv.id)} style={{ ...S.btn, ...S.btnPrimary, padding: '4px 8px', fontSize: 11 }}>+Lote</button>
+                <button onClick={() => { setForm({ name: inv.name, unit: inv.unit, isPerishable: inv.isPerishable, minimumStock: String(inv.minimumStock) }); setEditId(inv.id); setShowForm(true); }} style={{ ...S.btn, ...S.btnSecondary, padding: '4px 8px', fontSize: 11 }}>Editar</button>
+                <button onClick={async () => { if (confirm(`¿Eliminar "${inv.name}" del inventario?`)) { await api.deleteInventoryItem(inv.id); fetchInventory(); } }} style={{ ...S.btn, ...S.btnDanger, padding: '4px 8px', fontSize: 11 }}>Eliminar</button>
+              </div>
             </div>
           </div>
         ))}

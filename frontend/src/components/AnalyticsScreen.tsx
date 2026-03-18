@@ -264,7 +264,7 @@ export default function AnalyticsScreen() {
                             <div>
                               <span style={{ fontSize: 11, color: 'var(--text-faint)', display: 'block' }}>Descuento</span>
                               <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--danger)' }}>
-                                -${order.discount.toFixed(2)}
+                                -${order.discount.toFixed(2)} ({order.subtotal && order.subtotal > 0 ? ((order.discount / order.subtotal) * 100).toFixed(0) : '?'}%)
                               </span>
                               {order.discount_authorized_by && (
                                 <span style={{ fontSize: 10, color: 'var(--text-faint)', display: 'block' }}>
